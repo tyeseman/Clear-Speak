@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { criticalStyles } from "@/app/critical-styles";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: criticalStyles }} />
+      </head>
       <body>
         <AuthGate>{children}</AuthGate>
       </body>
