@@ -50,6 +50,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="block text-xl font-bold text-leaf">ClearSpeak Coach</span>
             <span className="block text-sm text-ink/70">Clarity with your own voice</span>
           </Link>
+          <span className="rounded-md bg-[#eef5ef] px-3 py-1 text-xs font-semibold text-leaf">
+            v2026.06.23
+          </span>
         </div>
       </header>
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { StyleInjector } from "@/components/StyleInjector";
 import { criticalStyles } from "@/app/critical-styles";
 import "./globals.css";
 
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <style dangerouslySetInnerHTML={{ __html: criticalStyles }} />
       </head>
       <body>
+        <StyleInjector />
         <AuthGate>{children}</AuthGate>
       </body>
     </html>

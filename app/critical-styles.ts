@@ -91,6 +91,7 @@ export const criticalStyles = `
   .pb-28 { padding-bottom: 7rem; }
   .pl-6 { padding-left: 1.5rem; }
   .text-left { text-align: left; }
+  .text-xs { font-size: .75rem; }
   .text-sm { font-size: .875rem; }
   .text-xl { font-size: 1.25rem; }
   .text-2xl { font-size: 1.5rem; }
