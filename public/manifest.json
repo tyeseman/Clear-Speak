@@ -1,0 +1,16 @@
+{
+  "name": "ClearSpeak Coach",
+  "short_name": "ClearSpeak",
+  "description": "Pronunciation, reading, and speaking clarity practice.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#2f6f5e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
