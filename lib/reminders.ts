@@ -1,4 +1,3 @@
-import { recommendNextLesson } from "@/lib/adaptive";
 import { loadProgress, saveProgress, todayKey } from "@/lib/progress";
 import type { PracticeReminder, ProgressState } from "@/lib/types";
 
@@ -12,7 +11,7 @@ export function checkDueReminders() {
   const reminders = progress.reminders.map((reminder) => {
     if (!isReminderDue(reminder, progress, now, today)) return reminder;
 
-    notify(reminderMessage(reminder, progress));
+    notify(reminderMessage(reminder));
     changed = true;
     return { ...reminder, lastFiredDateTime: now.toISOString() };
   });
@@ -43,22 +42,21 @@ function isReminderDue(
   return now.getTime() - last.getTime() >= reminder.followUpMinutes * 60 * 1000;
 }
 
-function reminderMessage(reminder: PracticeReminder, progress: ProgressState) {
+function reminderMessage(reminder: PracticeReminder) {
   if (reminder.kind === "reading") {
-    return "ClearSpeak Coach: read for 1 minute today. Small reading counts.";
+    return "Take 5 minutes to read today.";
   }
 
-  const recommendation = recommendNextLesson(progress);
   if (reminder.adaptive) {
-    return `ClearSpeak Coach: ${recommendation.lesson.name} is your best next lesson. ${recommendation.practiceWarning}`;
+    return "Time for your KoloSpeak practice.";
   }
 
-  return `ClearSpeak Coach: ${reminder.label} is ready.`;
+  return "Time for your KoloSpeak practice.";
 }
 
 function notify(message: string) {
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("ClearSpeak Coach", { body: message });
+    new Notification("KoloSpeak Coach", { body: message });
     return;
   }
   window.dispatchEvent(new CustomEvent("clearspeak-reminder", { detail: message }));

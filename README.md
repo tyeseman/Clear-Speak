@@ -1,6 +1,6 @@
-# ClearSpeak Coach
+# KoloSpeak Coach
 
-ClearSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, and speaking clarity practice. It is built for Hostinger Node.js Web App hosting and keeps OpenAI keys server-side.
+KoloSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, and speaking clarity practice. It is built for Hostinger Node.js Web App hosting and keeps OpenAI keys server-side.
 
 ## What The App Does
 

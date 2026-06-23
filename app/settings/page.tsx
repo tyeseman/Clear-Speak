@@ -201,6 +201,9 @@ export default function SettingsPage() {
             and browser permission settings. Follow-ups repeat while a lesson or
             reading session is still incomplete for today.
           </p>
+          <p className="mt-2 text-sm text-ink/60">
+            Reminder sounds depend on your phone notification settings.
+          </p>
           {message ? <p className="mt-3 font-semibold text-leaf">{message}</p> : null}
         </section>
 

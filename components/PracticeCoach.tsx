@@ -55,7 +55,7 @@ export function PracticeCoach({
         <p className="font-bold uppercase tracking-wide text-leaf">Start here</p>
         <h1 className="mt-2 text-3xl font-bold">Complete your baseline first</h1>
         <p className="mt-3 max-w-2xl text-lg leading-8 text-ink/70">
-          ClearSpeak Coach needs your starting assessment before daily lessons so
+          KoloSpeak Coach needs your starting assessment before daily lessons so
           progress, weak sounds, and before-after comparison have a real baseline.
         </p>
         <Link

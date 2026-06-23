@@ -1,5 +1,11 @@
-const CACHE_NAME = "clearspeak-v2";
-const STATIC_ASSETS = ["/manifest.json", "/icon.svg"];
+const CACHE_NAME = "kolospeak-v1";
+const STATIC_ASSETS = [
+  "/manifest.json",
+  "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png"
+];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

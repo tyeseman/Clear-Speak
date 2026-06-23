@@ -1,8 +1,9 @@
 {
-  "name": "ClearSpeak Coach",
-  "short_name": "ClearSpeak",
+  "name": "KoloSpeak Coach",
+  "short_name": "KoloSpeak",
   "description": "Pronunciation, reading, and speaking clarity practice.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f7f4ee",
   "theme_color": "#2f6f5e",
@@ -11,6 +12,18 @@
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

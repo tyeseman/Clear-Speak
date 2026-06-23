@@ -61,7 +61,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           </div>
           <h1 className="mt-4 text-2xl font-bold">Private access</h1>
           <p className="mt-2 text-ink/70">
-            ClearSpeak Coach is private for hello@leonctyes.com.
+            KoloSpeak Coach is private for hello@leonctyes.com.
           </p>
           <label className="mt-5 block">
             <span className="font-semibold text-ink/75">Email</span>
