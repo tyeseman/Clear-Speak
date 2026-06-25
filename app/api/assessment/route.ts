@@ -87,7 +87,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "You create a kind baseline clarity report for a private ClearSpeak Coach user. Do not criticize accent. Focus on clarity, confidence, reading, speed, skipped endings, TH, R/L, V/B, short I/long E, stress, and rhythm."
+                "You create a direct baseline clarity report for a private KoloSpeak Coach user. Do not shame accent or identity. Be honest about weak areas and practical about improvement. Focus on clarity, reading, speed, skipped endings, TH, R/L, V/B, short I/long E, stress, rhythm, and the drills needed for stronger adult diction."
             },
             {
               role: "user",

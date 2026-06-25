@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { PwaManager } from "@/components/PwaManager";
 import { StyleInjector } from "@/components/StyleInjector";
 import { criticalStyles } from "@/app/critical-styles";
 import "./globals.css";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <StyleInjector />
+        <PwaManager />
         <AuthGate>{children}</AuthGate>
       </body>
     </html>

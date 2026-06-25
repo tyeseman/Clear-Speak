@@ -90,10 +90,10 @@ export function TTSButton({ text }: { text: string }) {
           onClick={() => playHighQuality(0.9)}
           disabled={loading}
           className="focus-ring inline-flex h-10 items-center gap-2 rounded-md border border-black/10 bg-white px-3 text-sm font-semibold text-ink disabled:opacity-60"
-          title="Optional high quality OpenAI voice"
+          title="Optional premium voice"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          HQ voice
+          Premium voice
         </button>
       ) : null}
       {error ? <span className="text-sm text-coral">{error}</span> : null}

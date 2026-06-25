@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Plus, Save, SlidersHorizontal } from "lucide-react";
+import { Bell, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { defaultProgress, loadProgress, saveProgress, todayKey } from "@/lib/progress";
 import type { ProgressState } from "@/lib/types";
@@ -72,6 +72,20 @@ export default function SettingsPage() {
     setProgress(next);
     saveProgress(next);
     setMessage(successMessage);
+  }
+
+  async function clearAppCache() {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+
+    setMessage("App cache cleared. Your saved progress was not deleted. Reload the page if needed.");
   }
 
   const todayPrefix = `${todayKey()}:`;
@@ -260,14 +274,14 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
-          <h2 className="text-xl font-bold">AI Usage Control</h2>
+          <h2 className="text-xl font-bold">Usage Control</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <div className="rounded-md bg-[#f7f4ee] p-4">
-              <div className="text-sm font-semibold text-ink/60">AI calls today</div>
+              <div className="text-sm font-semibold text-ink/60">Coach checks today</div>
               <div className="mt-1 text-3xl font-bold text-leaf">{aiCallsToday}</div>
             </div>
             <div className="rounded-md bg-[#f7f4ee] p-4">
-              <div className="text-sm font-semibold text-ink/60">Last AI feature</div>
+              <div className="text-sm font-semibold text-ink/60">Last checked feature</div>
               <div className="mt-1 font-bold">{lastAiEvent?.feature ?? "None today"}</div>
               {lastAiEvent ? <div className="mt-1 text-sm text-ink/60">{lastAiEvent.reason}</div> : null}
             </div>
@@ -280,7 +294,7 @@ export default function SettingsPage() {
             <label className="flex items-center justify-between gap-4 rounded-md border border-black/10 p-4">
               <span>
                 <span className="block font-semibold">Cost-saving mode</span>
-                <span className="block text-sm text-ink/60">Keep OpenAI calls limited to submit actions.</span>
+                <span className="block text-sm text-ink/60">Keep coach checks limited to submit actions.</span>
               </span>
               <input
                 type="checkbox"
@@ -294,7 +308,7 @@ export default function SettingsPage() {
             <label className="flex items-center justify-between gap-4 rounded-md border border-black/10 p-4">
               <span>
                 <span className="block font-semibold">High-quality voice</span>
-                <span className="block text-sm text-ink/60">Show the optional OpenAI voice button.</span>
+                <span className="block text-sm text-ink/60">Show the optional premium voice button.</span>
               </span>
               <input
                 type="checkbox"
@@ -307,16 +321,32 @@ export default function SettingsPage() {
             </label>
           </div>
           <div className="mt-5 rounded-md bg-[#f7f4ee] p-4">
-            <div className="font-semibold">Recent AI calls</div>
+            <div className="font-semibold">Recent coach checks</div>
             <div className="mt-3 space-y-2">
               {progress.apiUsageEvents.slice(-5).reverse().map((event) => (
                 <div key={`${event.date}-${event.feature}`} className="text-sm text-ink/70">
                   {new Date(event.date).toLocaleString()} - {event.feature} - {event.success ? "success" : "failed"}
                 </div>
               ))}
-              {!progress.apiUsageEvents.length ? <p className="text-sm text-ink/60">No AI calls logged yet.</p> : null}
+              {!progress.apiUsageEvents.length ? <p className="text-sm text-ink/60">No coach checks logged yet.</p> : null}
             </div>
           </div>
+        </section>
+
+        <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
+          <h2 className="text-xl font-bold">App cache</h2>
+          <p className="mt-3 leading-7 text-ink/70">
+            Clear cached app files if the normal browser shows a blank screen after an update.
+            This does not erase your saved progress.
+          </p>
+          <button
+            type="button"
+            onClick={clearAppCache}
+            className="focus-ring mt-5 inline-flex h-12 items-center gap-2 rounded-md border border-black/10 bg-white px-4 font-semibold text-ink"
+          >
+            <Trash2 size={18} />
+            Clear app cache
+          </button>
         </section>
 
         <section className="mt-5 rounded-md bg-white p-5 shadow-soft">

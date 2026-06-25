@@ -49,7 +49,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!ready) {
-    return <div className="min-h-screen bg-[#f7f4ee]" />;
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f7f4ee] px-4">
+        <section className="w-full max-w-sm rounded-md bg-white p-5 shadow-soft">
+          <h1 className="text-2xl font-bold text-ink">Loading KoloSpeak</h1>
+          <p className="mt-3 leading-7 text-ink/70">
+            If this screen does not finish loading, open Settings after login and use Clear app cache.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   if (!authed) {

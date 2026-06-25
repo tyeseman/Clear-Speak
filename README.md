@@ -1,6 +1,6 @@
 # KoloSpeak Coach
 
-KoloSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, and speaking clarity practice. It is built for Hostinger Node.js Web App hosting and keeps OpenAI keys server-side.
+KoloSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, and speaking clarity practice. It is built for Hostinger Node.js Web App hosting and keeps coach-service keys server-side.
 
 ## What The App Does
 
@@ -14,31 +14,31 @@ KoloSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, 
 - Reading habit flow: choose, hear, read silently, speak aloud, explain, and save.
 - Reading preferences for topics, custom topic, level, length, 1-minute mode, favorite passages, and reading goal.
 - Local progress tracking for scores, streaks, completed lessons, weak sounds, missed words, skipped words, endings, speed, reading accuracy, and before-after comparison.
-- AI usage control panel with calls today, last AI feature used, cost-saving mode, and high-quality voice toggle.
+- Usage control panel with checks today, last checked feature, cost-saving mode, and high-quality voice toggle.
 - Browser text-to-speech by default.
-- Optional OpenAI high-quality voice button with server-side caching.
-- OpenAI speech-to-text only after the user submits a recording.
-- OpenAI feedback only after transcription.
+- Optional high-quality voice button with server-side caching.
+- Speech-to-text only after the user submits a recording.
+- Coach feedback only after transcription.
 
-## OpenAI Usage Controls
+## Usage Controls
 
-OpenAI is not called on page load, dashboard view, lesson page, reading page, reminders, or progress page.
+The coaching service is not called on page load, dashboard view, lesson page, reading page, reminders, or progress page.
 
-OpenAI is used only for:
+The coaching service is used only for:
 
 - Speech-to-text after Submit.
-- AI feedback after transcription.
+- Coach feedback after transcription.
 - Optional high-quality voice when the HQ voice button is clicked.
 - Baseline or progress assessment after Submit.
 
-Adaptive coaching uses local rules first. The app chooses the next lesson from saved progress before using any AI recommendation system.
+Adaptive coaching uses local rules first. The app chooses the next lesson from saved progress before using any outside recommendation system.
 
 Cost controls included:
 
 - Local lesson data first.
 - Browser speech synthesis is the default free voice.
-- OpenAI TTS is optional and cached in `.cache/tts`.
-- Cached OpenAI audio is returned before rate limit counting.
+- Premium voice is optional and cached in `.cache/tts`.
+- Cached premium audio is returned before rate limit counting.
 - Recordings are user-submitted only.
 - Compact JSON prompts.
 - `gpt-4o-mini` for routine feedback and reports.
@@ -46,7 +46,7 @@ Cost controls included:
 - Basic client usage counters in localStorage.
 - Basic AI usage event log in localStorage.
 - Basic server-side in-memory rate limiting.
-- Allowed email and API passcode required for all OpenAI routes.
+- Allowed email and API passcode required for all coach-service routes.
 
 ## Local Setup
 

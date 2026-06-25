@@ -229,7 +229,7 @@ export function PracticeCoach({
 
       {step === 5 ? (
         <section className="rounded-md bg-white p-5 shadow-soft">
-          <h2 className="text-xl font-bold">AI feedback</h2>
+          <h2 className="text-xl font-bold">Coach feedback</h2>
           {feedback ? (
             <div className="mt-4 space-y-4">
               <div className="flex items-center gap-3">
@@ -324,13 +324,22 @@ export function PracticeCoach({
         >
           Back
         </button>
-        <button
-          type="button"
-          onClick={() => setStep(Math.min(5, step + 1))}
-          className="focus-ring h-12 rounded-md bg-leaf px-5 font-semibold text-white"
-        >
-          Next
-        </button>
+        {step === 5 ? (
+          <Link
+            href="/progress"
+            className="focus-ring inline-flex h-12 items-center rounded-md bg-leaf px-5 font-semibold text-white"
+          >
+            Done
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setStep(Math.min(5, step + 1))}
+            className="focus-ring h-12 rounded-md bg-leaf px-5 font-semibold text-white"
+          >
+            Next
+          </button>
+        )}
       </div>
     </div>
   );

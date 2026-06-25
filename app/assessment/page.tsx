@@ -98,7 +98,7 @@ export default function AssessmentPage() {
           <h1 className="mt-2 text-3xl font-bold text-ink">Baseline clarity check</h1>
           <p className="mt-3 max-w-3xl text-lg leading-8 text-ink/70">
             Record the full list one time. This creates your starting report and first
-            7-day practice plan. It uses OpenAI only after you submit.
+            7-day practice plan. Coach checks run only after you submit.
           </p>
           {progress?.baselineCompleted ? (
             <p className="mt-4 rounded-md bg-[#eef5ef] p-3 font-semibold text-leaf">
