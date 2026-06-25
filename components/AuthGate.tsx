@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Lock, LogOut } from "lucide-react";
 import { clearAuth, defaultUserEmail, isAuthenticated, saveAuth } from "@/lib/progress";
+import { initializeRemoteDatabase, loadRemoteProgress } from "@/lib/remoteProgress";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -13,7 +14,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setAuthed(isAuthenticated());
+    const authenticated = isAuthenticated();
+    setAuthed(authenticated);
+    if (authenticated) {
+      initializeRemoteDatabase()
+        .then(() => loadRemoteProgress())
+        .catch(() => undefined);
+    }
     setReady(true);
   }, []);
 
@@ -33,6 +40,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       }
       const body = (await response.json()) as { email?: string };
       saveAuth(passcode, body.email ?? email);
+      await initializeRemoteDatabase();
+      await loadRemoteProgress();
       setAuthed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Private access required.");

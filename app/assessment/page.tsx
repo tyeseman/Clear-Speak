@@ -16,6 +16,7 @@ import {
   saveBaselineReport,
   saveProgress
 } from "@/lib/progress";
+import { saveRemoteProgress } from "@/lib/remoteProgress";
 
 export default function AssessmentPage() {
   const [progress, setProgress] = useState<ProgressState | null>(null);
@@ -23,6 +24,7 @@ export default function AssessmentPage() {
   const [report, setReport] = useState<AssessmentReport | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
 
   useEffect(() => {
     setProgress(loadProgress());
@@ -80,6 +82,12 @@ export default function AssessmentPage() {
       });
       saveProgress(next);
       setProgress(next);
+      setSaveStatus("saving");
+      const saved = await saveRemoteProgress(next);
+      setSaveStatus(saved.ok ? "saved" : "failed");
+      if (!saved.ok) {
+        setError("Practice completed, but progress was not saved. Please try again.");
+      }
     } catch {
       setError("We could not complete the assessment. Please try again.");
     } finally {
@@ -155,6 +163,11 @@ export default function AssessmentPage() {
             <Recorder onSubmit={submitAssessment} />
           </div>
           {busy ? <p className="mt-3 text-ink/65">Creating your starting report...</p> : null}
+          {saveStatus !== "idle" ? (
+            <p className="mt-3 font-semibold text-leaf">
+              {saveStatus === "saving" ? "Saving" : saveStatus === "failed" ? "Save failed" : "Saved"}
+            </p>
+          ) : null}
           {error ? <p className="mt-3 font-semibold text-coral">{error}</p> : null}
         </section>
 

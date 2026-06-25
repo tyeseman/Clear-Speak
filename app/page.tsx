@@ -8,6 +8,7 @@ import { StatCard } from "@/components/StatCard";
 import { lessons } from "@/data/lessons";
 import { recommendNextLesson } from "@/lib/adaptive";
 import { defaultProgress, loadProgress } from "@/lib/progress";
+import { loadRemoteProgress } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -17,6 +18,9 @@ export default function DashboardPage() {
   useEffect(() => {
     setProgress(loadProgress());
     setMounted(true);
+    loadRemoteProgress()
+      .then(() => setProgress(loadProgress()))
+      .catch(() => undefined);
   }, []);
 
   const weakSounds = useMemo(() => {

@@ -13,7 +13,8 @@ KoloSpeak Coach is a private Next.js MVP for pronunciation, reading confidence, 
 - Starter lessons focused on TH, R/L, V/B, short I/long E, final consonants, word stress, and sentence rhythm.
 - Reading habit flow: choose, hear, read silently, speak aloud, explain, and save.
 - Reading preferences for topics, custom topic, level, length, 1-minute mode, favorite passages, and reading goal.
-- Local progress tracking for scores, streaks, completed lessons, weak sounds, missed words, skipped words, endings, speed, reading accuracy, and before-after comparison.
+- Hostinger MySQL progress tracking for scores, streaks, completed lessons, weak sounds, missed words, skipped words, endings, speed, reading accuracy, settings, and usage logs.
+- Browser localStorage fallback backup if the database is temporarily unavailable.
 - Usage control panel with checks today, last checked feature, cost-saving mode, and high-quality voice toggle.
 - Browser text-to-speech by default.
 - Optional high-quality voice button with server-side caching.
@@ -43,8 +44,8 @@ Cost controls included:
 - Compact JSON prompts.
 - `gpt-4o-mini` for routine feedback and reports.
 - `gpt-4o-mini-transcribe` for transcription.
-- Basic client usage counters in localStorage.
-- Basic AI usage event log in localStorage.
+- Basic client usage counters as a fallback.
+- Server-side AI usage event log in MySQL when configured.
 - Basic server-side in-memory rate limiting.
 - Allowed email and API passcode required for all coach-service routes.
 
@@ -62,6 +63,12 @@ npm install
 OPENAI_API_KEY=your_openai_api_key_here
 CLEARSPEAK_PASSCODE=choose_a_private_one_time_passcode
 ALLOWED_EMAILS=hello@leonctyes.com
+APP_SESSION_SECRET=choose_a_long_random_secret
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=u506283269_kolospeak
+DB_USER=u506283269_kolospeak_user
+DB_PASSWORD=your_hostinger_mysql_password
 ```
 
 3. Run the app:
@@ -98,7 +105,26 @@ clearspeak.leonctyes.com
 OPENAI_API_KEY=your_openai_api_key_here
 CLEARSPEAK_PASSCODE=choose_a_private_one_time_passcode
 ALLOWED_EMAILS=hello@leonctyes.com
+APP_SESSION_SECRET=choose_a_long_random_secret
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=u506283269_kolospeak
+DB_USER=u506283269_kolospeak_user
+DB_PASSWORD=your_hostinger_mysql_password
 ```
+
+Do not put these values in browser code. Add them only in Hostinger's Node.js Web App environment variable screen or in local `.env.local`.
+
+The MySQL database can start blank in phpMyAdmin. After private login, the app initializes these tables automatically:
+
+- `users`
+- `progress`
+- `lesson_results`
+- `reading_results`
+- `sound_scores`
+- `conversation_results`
+- `settings`
+- `ai_usage_logs`
 
 3. Build locally:
 
@@ -138,7 +164,7 @@ npm run start
 
 ## Notes
 
-- Progress is stored locally in the browser with localStorage.
+- Progress is stored in Hostinger MySQL when DB variables are configured. localStorage remains a backup so practice can continue if the database save fails.
 - Server-side rate limits reset when the Node app restarts because they are in memory.
 - The MVP does not use the Realtime API.
 - This is a coaching MVP, not a clinical speech therapy tool.

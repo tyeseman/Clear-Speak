@@ -17,6 +17,11 @@ import {
 } from "@/lib/progress";
 import { Recorder } from "@/components/Recorder";
 import { TTSButton } from "@/components/TTSButton";
+import {
+  saveRemoteLessonResult,
+  saveRemoteProgress,
+  saveRemoteSoundScore
+} from "@/lib/remoteProgress";
 
 const steps = ["Warm-up", "Sound", "Listen", "Read", "Record", "Feedback"];
 
@@ -35,6 +40,7 @@ export function PracticeCoach({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [baselineReady, setBaselineReady] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
 
   useEffect(() => {
     setBaselineReady(loadProgress().baselineCompleted);
@@ -123,6 +129,26 @@ export function PracticeCoach({
         selectedText
       );
       saveProgress(nextProgress);
+      setSaveStatus("saving");
+      const [progressSave, lessonSave, soundSave] = await Promise.all([
+        saveRemoteProgress(nextProgress),
+        saveRemoteLessonResult({
+          lessonId: lesson.id,
+          lessonTitle: lesson.name,
+          score: feedbackData.score,
+          feedback: feedbackData
+        }),
+        saveRemoteSoundScore({
+          soundKey: lesson.targetSound || lesson.id,
+          score: feedbackData.score,
+          attempts: 1
+        })
+      ]);
+      const saved = progressSave.ok && lessonSave.ok && soundSave.ok;
+      setSaveStatus(saved ? "saved" : "failed");
+      if (!saved) {
+        setError("Practice completed, but progress was not saved. Please try again.");
+      }
       setStep(5);
     } catch {
       setError("We could not check that recording. Please try again.");
@@ -238,9 +264,20 @@ export function PracticeCoach({
                 </div>
                 <div>
                   <div className="font-semibold">Session saved</div>
-                  <div className="text-sm text-ink/65">Your progress stays on this device.</div>
+                  <div className="text-sm text-ink/65">
+                    {saveStatus === "saving"
+                      ? "Saving"
+                      : saveStatus === "failed"
+                        ? "Save failed"
+                        : "Saved"}
+                  </div>
                 </div>
               </div>
+              {saveStatus === "failed" ? (
+                <p className="rounded-md bg-warm/50 p-3 font-semibold text-coral">
+                  Practice completed, but progress was not saved. Please try again.
+                </p>
+              ) : null}
               <FeedbackLine title="What improved" text={feedback.whatImproved} />
               <FeedbackLine title="What needs work" text={feedback.needsWork ?? feedback.mainIssue} />
               <FeedbackLine title="Mouth tip" text={feedback.mouthTip} />

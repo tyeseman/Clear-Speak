@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { StatCard } from "@/components/StatCard";
 import { lessons } from "@/data/lessons";
 import { defaultProgress, loadProgress } from "@/lib/progress";
+import { loadRemoteProgress } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
 
 export default function ProgressPage() {
@@ -12,6 +13,9 @@ export default function ProgressPage() {
 
   useEffect(() => {
     setProgress(loadProgress());
+    loadRemoteProgress()
+      .then(() => setProgress(loadProgress()))
+      .catch(() => undefined);
   }, []);
 
   const averageReading = progress.readingScores.length

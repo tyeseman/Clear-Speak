@@ -267,6 +267,24 @@ export function noteApiUse(action: string, reason = "User requested coaching", s
     },
     apiUsageEvents: [...progress.apiUsageEvents, event].slice(-100)
   });
+
+  if (typeof window !== "undefined") {
+    fetch("/api/db/ai-usage-log", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-clearspeak-passcode": getStoredPasscode(),
+        "x-clearspeak-email": getStoredUserEmail()
+      },
+      body: JSON.stringify({
+        feature: action,
+        estimatedCost: 0,
+        tokensUsed: 0,
+        audioSeconds: null
+      }),
+      cache: "no-store"
+    }).catch(() => undefined);
+  }
 }
 
 export function saveReadingPreferences(preferences: ReadingPreferences) {

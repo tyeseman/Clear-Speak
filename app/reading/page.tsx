@@ -23,6 +23,11 @@ import {
   saveReadingPreferences,
   saveReadingSession
 } from "@/lib/progress";
+import {
+  saveRemoteProgress,
+  saveRemoteReadingResult,
+  saveRemoteSettings
+} from "@/lib/remoteProgress";
 import type { FeedbackResult, ProgressState, ReadingPreferences } from "@/lib/types";
 
 const steps = ["Choose", "Hear", "Read", "Speak", "Explain", "Save"];
@@ -38,6 +43,7 @@ export default function ReadingPage() {
   const [missedWords, setMissedWords] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
 
   useEffect(() => {
     const current = loadProgress();
@@ -58,7 +64,9 @@ export default function ReadingPage() {
   function updatePreferences(next: ReadingPreferences) {
     setPreferences(next);
     saveReadingPreferences(next);
-    setProgress(loadProgress());
+    const updated = loadProgress();
+    setProgress(updated);
+    saveRemoteSettings(updated).catch(() => undefined);
   }
 
   function toggleTopic(topic: string) {
@@ -123,10 +131,10 @@ export default function ReadingPage() {
     }
   }
 
-  function saveSession() {
+  async function saveSession() {
     if (!preferences) return;
     const comprehensionScore = scoreExplanation(passage, explanation);
-    saveReadingSession({
+    const session = {
       id: `reading-${Date.now()}`,
       date: new Date().toISOString().slice(0, 10),
       topic: selectedTopic,
@@ -139,9 +147,19 @@ export default function ReadingPage() {
       skippedWords: feedback?.skippedWords ?? missedWords,
       finalSoundsDropped: feedback?.skippedEndings ?? findSkippedEndings(passage, missedWords),
       explanation
-    });
-    setProgress(loadProgress());
-    setMessage("Reading session saved.");
+    };
+    saveReadingSession(session);
+    const nextProgress = loadProgress();
+    setProgress(nextProgress);
+    setSaveStatus("saving");
+    setMessage("Saving");
+    const [progressSave, readingSave] = await Promise.all([
+      saveRemoteProgress(nextProgress),
+      saveRemoteReadingResult(session)
+    ]);
+    const saved = progressSave.ok && readingSave.ok;
+    setSaveStatus(saved ? "saved" : "failed");
+    setMessage(saved ? "Reading session saved." : "Practice completed, but progress was not saved. Please try again.");
     setStep(5);
   }
 
@@ -372,6 +390,11 @@ export default function ReadingPage() {
                 <div className="font-semibold">What the app heard</div>
                 <p className="mt-2 text-ink/70">{transcription}</p>
               </div>
+            ) : null}
+            {saveStatus !== "idle" ? (
+              <p className={`mt-4 font-semibold ${saveStatus === "failed" ? "text-coral" : "text-leaf"}`}>
+                {saveStatus === "saving" ? "Saving" : saveStatus === "failed" ? "Save failed" : "Saved"}
+              </p>
             ) : null}
           </section>
         ) : null}

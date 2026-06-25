@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { defaultProgress, loadProgress, saveProgress, todayKey } from "@/lib/progress";
+import { saveRemoteProgress, saveRemoteSettings } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -26,16 +27,20 @@ export default function SettingsPage() {
     const next = { ...progress, notificationsEnabled: permission === "granted" };
     setProgress(next);
     saveProgress(next);
+    const saved = await saveRemoteSettings(next);
     setMessage(
-      permission === "granted"
-        ? "Notifications are enabled for this browser."
-        : "Notifications were not enabled. In-app reminder text will still show."
+      saved.ok
+        ? permission === "granted"
+          ? "Notifications are enabled for this browser."
+          : "Notifications were not enabled. In-app reminder text will still show."
+        : "Practice completed, but progress was not saved. Please try again."
     );
   }
 
-  function saveReminder() {
+  async function saveReminder() {
     saveProgress(progress);
-    setMessage("Reminder settings saved on this device.");
+    const saved = await saveRemoteSettings(progress);
+    setMessage(saved.ok ? "Reminder settings saved." : "Practice completed, but progress was not saved. Please try again.");
   }
 
   function updateReminder(
@@ -68,10 +73,19 @@ export default function SettingsPage() {
     });
   }
 
-  function updateProgress(next: ProgressState, successMessage = "Settings saved.") {
+  async function updateProgress(next: ProgressState, successMessage = "Settings saved.") {
     setProgress(next);
     saveProgress(next);
-    setMessage(successMessage);
+    setMessage("Saving");
+    const [progressSaved, settingsSaved] = await Promise.all([
+      saveRemoteProgress(next),
+      saveRemoteSettings(next)
+    ]);
+    setMessage(
+      progressSaved.ok && settingsSaved.ok
+        ? successMessage
+        : "Practice completed, but progress was not saved. Please try again."
+    );
   }
 
   async function clearAppCache() {
