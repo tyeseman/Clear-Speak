@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { defaultProgress, loadProgress, saveProgress, todayKey } from "@/lib/progress";
-import { saveRemoteProgress, saveRemoteSettings } from "@/lib/remoteProgress";
+import { defaultProgress, getProgressKey, loadProgress, saveProgress, todayKey } from "@/lib/progress";
+import { resetRemoteProgress, saveRemoteProgress, saveRemoteSettings } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [progress, setProgress] = useState<ProgressState>(defaultProgress);
   const [message, setMessage] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     setProgress(loadProgress());
@@ -100,6 +105,36 @@ export default function SettingsPage() {
     }
 
     setMessage("App cache cleared. Your saved progress was not deleted. Reload the page if needed.");
+  }
+
+  async function resetAllProgress() {
+    setResetting(true);
+    setMessage("Resetting progress");
+    const freshProgress: ProgressState = {
+      ...defaultProgress,
+      reminders: defaultProgress.reminders.map((reminder) => ({ ...reminder })),
+      apiUsage: {},
+      apiUsageEvents: [],
+      liveMinutesUsed: {}
+    };
+
+    try {
+      window.localStorage.setItem(getProgressKey(), JSON.stringify(freshProgress));
+      setProgress(freshProgress);
+      const reset = await resetRemoteProgress(freshProgress);
+      if (!reset.ok) {
+        await saveRemoteProgress(freshProgress);
+      }
+      setMessage(
+        reset.ok
+          ? "Progress reset. Taking you back to the beginning."
+          : "Local progress reset. Remote reset could not be confirmed, but the starting progress was saved."
+      );
+      setConfirmReset(false);
+      window.setTimeout(() => router.push("/"), 900);
+    } finally {
+      setResetting(false);
+    }
   }
 
   const todayPrefix = `${todayKey()}:`;
@@ -348,6 +383,20 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
+          <h2 className="text-xl font-bold">Diagnostics</h2>
+          <p className="mt-3 leading-7 text-ink/70">
+            Check database, OpenAI setup, microphone support, live speech detection,
+            browser voice, and local progress state before a full test.
+          </p>
+          <Link
+            href="/diagnostics"
+            className="focus-ring mt-5 inline-flex h-12 items-center rounded-md bg-leaf px-4 font-semibold text-white"
+          >
+            Open diagnostics
+          </Link>
+        </section>
+
+        <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
           <h2 className="text-xl font-bold">App cache</h2>
           <p className="mt-3 leading-7 text-ink/70">
             Clear cached app files if the normal browser shows a blank screen after an update.
@@ -361,6 +410,51 @@ export default function SettingsPage() {
             <Trash2 size={18} />
             Clear app cache
           </button>
+        </section>
+
+        <section className="mt-5 rounded-md border border-coral/30 bg-white p-5 shadow-soft">
+          <h2 className="text-xl font-bold text-coral">Restart app progress</h2>
+          <p className="mt-3 leading-7 text-ink/70">
+            This resets Smart Start, lessons, reading, live drills, word banks,
+            conversation practice, streaks, scores, and saved progress for this user.
+            You will return to the beginning after login.
+          </p>
+          {!confirmReset ? (
+            <button
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              className="focus-ring mt-5 inline-flex h-12 items-center gap-2 rounded-md border border-coral/40 bg-white px-4 font-semibold text-coral"
+            >
+              <Trash2 size={18} />
+              Reset all progress
+            </button>
+          ) : (
+            <div className="mt-5 rounded-md bg-warm/50 p-4">
+              <p className="font-semibold text-ink">
+                Are you sure you want to reset? All of your progress will be erased,
+                and the app will take you back to the beginning.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={resetAllProgress}
+                  disabled={resetting}
+                  className="focus-ring inline-flex h-11 items-center gap-2 rounded-md bg-coral px-4 font-semibold text-white disabled:opacity-60"
+                >
+                  <Trash2 size={17} />
+                  {resetting ? "Resetting" : "Yes, erase my progress"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(false)}
+                  disabled={resetting}
+                  className="focus-ring h-11 rounded-md border border-black/10 bg-white px-4 font-semibold text-ink disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="mt-5 rounded-md bg-white p-5 shadow-soft">

@@ -1,8 +1,8 @@
 import "server-only";
 
-import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
+import mysql, { type Pool, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import { getAllowedEmails } from "@/lib/security";
-import type { ProgressState } from "@/lib/types";
+import type { ProgressState, WordBank, WordBankItem, WordDrillAttempt } from "@/lib/types";
 
 type GlobalWithDb = typeof globalThis & {
   kolospeakDbPool?: Pool;
@@ -16,6 +16,32 @@ type UserRow = RowDataPacket & {
 
 type SettingsRow = RowDataPacket & {
   settings_json: string | null;
+};
+
+type WordBankRow = RowDataPacket & {
+  id: number;
+  focus_area: string;
+  sound_category: string;
+  batch_size: 25 | 50 | 100;
+  source_reason: string;
+  created_at: Date;
+  completed_at: Date | null;
+};
+
+type WordBankItemRow = RowDataPacket & {
+  id: number;
+  word_bank_id: number;
+  word: string;
+  target_sound: string;
+  difficulty: "easy" | "medium" | "hard";
+  mouth_tip: string;
+  example_sentence: string;
+  common_mistake: string;
+  sound_category: string;
+  reason_selected: string;
+  status: "new" | "in-progress" | "mastered" | "review-later";
+  attempts: number;
+  best_score: number;
 };
 
 const globalForDb = globalThis as GlobalWithDb;
@@ -183,6 +209,66 @@ async function createTables() {
       PRIMARY KEY (id),
       KEY ai_usage_logs_user_created_idx (user_id, created_at),
       CONSTRAINT ai_usage_logs_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS word_banks (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      focus_area VARCHAR(160) NOT NULL,
+      sound_category VARCHAR(160) NOT NULL,
+      batch_size INT NOT NULL DEFAULT 50,
+      source_reason TEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME NULL,
+      PRIMARY KEY (id),
+      KEY word_banks_user_created_idx (user_id, created_at),
+      CONSTRAINT word_banks_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS word_bank_items (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      word_bank_id BIGINT UNSIGNED NOT NULL,
+      word VARCHAR(120) NOT NULL,
+      target_sound VARCHAR(160) NOT NULL,
+      difficulty VARCHAR(40) NOT NULL DEFAULT 'easy',
+      mouth_tip TEXT NULL,
+      example_sentence TEXT NULL,
+      common_mistake TEXT NULL,
+      sound_category VARCHAR(160) NOT NULL,
+      reason_selected TEXT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'new',
+      attempts INT NOT NULL DEFAULT 0,
+      best_score INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY word_bank_items_bank_status_idx (word_bank_id, status),
+      CONSTRAINT word_bank_items_bank_fk FOREIGN KEY (word_bank_id) REFERENCES word_banks(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS word_drill_attempts (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      word_bank_item_id BIGINT UNSIGNED NULL,
+      word VARCHAR(120) NOT NULL,
+      target_sound VARCHAR(160) NOT NULL,
+      heard_text VARCHAR(255) NULL,
+      attempts INT NOT NULL DEFAULT 1,
+      best_score INT NOT NULL DEFAULT 0,
+      passed TINYINT(1) NOT NULL DEFAULT 0,
+      review_later TINYINT(1) NOT NULL DEFAULT 0,
+      feedback_json LONGTEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY word_drill_attempts_user_created_idx (user_id, created_at),
+      CONSTRAINT word_drill_attempts_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT word_drill_attempts_item_fk FOREIGN KEY (word_bank_item_id) REFERENCES word_bank_items(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 }
@@ -421,6 +507,173 @@ export async function saveAiUsageLogToDb(input: {
       input.audioSeconds ?? null
     ]
   );
+}
+
+export async function resetUserProgressInDb(progress: ProgressState) {
+  const user = await getOrCreateDefaultUser();
+  const pool = getDbPool();
+
+  await pool.execute("DELETE FROM word_drill_attempts WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM word_banks WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM ai_usage_logs WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM conversation_results WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM sound_scores WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM reading_results WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM lesson_results WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM progress WHERE user_id = ?", [user.id]);
+  await pool.execute("DELETE FROM settings WHERE user_id = ?", [user.id]);
+
+  await saveProgressToDb(progress);
+}
+
+export async function loadLatestWordBankFromDb(focusArea?: string) {
+  const user = await getOrCreateDefaultUser();
+  const pool = getDbPool();
+  const params: Array<number | string> = [user.id];
+  const focusFilter = focusArea ? "AND focus_area = ?" : "";
+  if (focusArea) params.push(focusArea);
+
+  const [banks] = await pool.execute<WordBankRow[]>(
+    `
+      SELECT id, focus_area, sound_category, batch_size, source_reason, created_at, completed_at
+      FROM word_banks
+      WHERE user_id = ? ${focusFilter}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    params
+  );
+  const bank = banks[0];
+  if (!bank) return null;
+
+  const [items] = await pool.execute<WordBankItemRow[]>(
+    `
+      SELECT id, word_bank_id, word, target_sound, difficulty, mouth_tip, example_sentence,
+        common_mistake, sound_category, reason_selected, status, attempts, best_score
+      FROM word_bank_items
+      WHERE word_bank_id = ?
+      ORDER BY id ASC
+    `,
+    [bank.id]
+  );
+
+  return mapWordBank(bank, items);
+}
+
+export async function saveWordBankToDb(bank: WordBank) {
+  const user = await getOrCreateDefaultUser();
+  const pool = getDbPool();
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+      INSERT INTO word_banks (user_id, focus_area, sound_category, batch_size, source_reason)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [user.id, bank.focusArea, bank.soundCategory, bank.batchSize, bank.sourceReason]
+  );
+  const wordBankId = result.insertId;
+
+  for (const item of bank.items) {
+    await pool.execute(
+      `
+        INSERT INTO word_bank_items (
+          word_bank_id, word, target_sound, difficulty, mouth_tip, example_sentence,
+          common_mistake, sound_category, reason_selected, status, attempts, best_score
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        wordBankId,
+        item.word,
+        item.targetSound,
+        item.difficulty,
+        item.mouthTip,
+        item.exampleSentence,
+        item.commonMistake,
+        item.soundCategory,
+        item.reasonSelected,
+        item.status,
+        item.attempts,
+        item.bestScore
+      ]
+    );
+  }
+
+  return loadLatestWordBankFromDb(bank.focusArea);
+}
+
+export async function saveWordDrillAttemptToDb(input: WordDrillAttempt & { wordBankItemId?: number }) {
+  const user = await getOrCreateDefaultUser();
+  const pool = getDbPool();
+  await pool.execute(
+    `
+      INSERT INTO word_drill_attempts (
+        user_id, word_bank_item_id, word, target_sound, heard_text, attempts,
+        best_score, passed, review_later, feedback_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      user.id,
+      input.wordBankItemId ?? null,
+      input.word,
+      input.targetSound,
+      input.heardText,
+      input.attempts,
+      input.bestScore,
+      input.passed ? 1 : 0,
+      input.reviewLater ? 1 : 0,
+      JSON.stringify({ feedback: input.feedback })
+    ]
+  );
+
+  if (input.wordBankItemId) {
+    await pool.execute(
+      `
+        UPDATE word_bank_items
+        SET
+          attempts = attempts + 1,
+          best_score = GREATEST(best_score, ?),
+          status = ?
+        WHERE id = ?
+      `,
+      [
+        input.bestScore,
+        input.passed ? "mastered" : input.reviewLater ? "review-later" : "in-progress",
+        input.wordBankItemId
+      ]
+    );
+  }
+}
+
+function mapWordBank(bank: WordBankRow, items: WordBankItemRow[]): WordBank {
+  return {
+    id: bank.id,
+    focusArea: bank.focus_area,
+    soundCategory: bank.sound_category,
+    batchSize: bank.batch_size,
+    sourceReason: bank.source_reason,
+    createdAt: bank.created_at?.toISOString?.() ?? String(bank.created_at),
+    completedAt: bank.completed_at ? bank.completed_at.toISOString?.() ?? String(bank.completed_at) : null,
+    items: items.map(mapWordBankItem)
+  };
+}
+
+function mapWordBankItem(item: WordBankItemRow): WordBankItem {
+  return {
+    id: item.id,
+    wordBankId: item.word_bank_id,
+    word: item.word,
+    targetSound: item.target_sound,
+    difficulty: item.difficulty,
+    mouthTip: item.mouth_tip,
+    exampleSentence: item.example_sentence,
+    commonMistake: item.common_mistake,
+    soundCategory: item.sound_category,
+    reasonSelected: item.reason_selected,
+    status: item.status,
+    attempts: item.attempts,
+    bestScore: item.best_score
+  };
 }
 
 function parseJson<T = unknown>(value: string | null | undefined): T | null {

@@ -1,10 +1,15 @@
 import type {
   ApiUsageEvent,
   BaselineReport,
+  ConversationSession,
   FeedbackResult,
+  LessonProgress,
   ProgressState,
   ReadingPreferences,
-  ReadingSession
+  ReadingSession,
+  SmartStartProfile,
+  WordBank,
+  WordDrillAttempt
 } from "@/lib/types";
 
 export const progressKey = "clearspeak-progress-v1";
@@ -16,6 +21,7 @@ export const defaultUserEmail = "hello@leonctyes.com";
 export const defaultProgress: ProgressState = {
   baselineCompleted: false,
   baselineReport: null,
+  smartStartProfile: null,
   learnerProfile: {
     goal: "Speak slower and clearer in daily life",
     confidenceRating: 3,
@@ -40,8 +46,16 @@ export const defaultProgress: ProgressState = {
   streak: 0,
   lastPracticedDate: null,
   soundScores: [],
+  lessonProgress: [],
   lessonAttempts: [],
   completedLessons: [],
+  conversationSessions: [],
+  wordBanks: [],
+  wordDrillAttempts: [],
+  reviewLaterWords: [],
+  masteredWords: [],
+  liveMinutesUsed: {},
+  coachPlanUpdate: null,
   readingScores: [],
   missedWords: {},
   skippedWords: {},
@@ -95,7 +109,23 @@ export function loadProgress(): ProgressState {
   const raw = window.localStorage.getItem(key) ?? window.localStorage.getItem(progressKey);
   if (!raw) return defaultProgress;
   try {
-    return { ...defaultProgress, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<ProgressState>;
+    return {
+      ...defaultProgress,
+      ...parsed,
+      learnerProfile: { ...defaultProgress.learnerProfile, ...parsed.learnerProfile },
+      readingPreferences: { ...defaultProgress.readingPreferences, ...parsed.readingPreferences },
+      reminders: parsed.reminders ?? defaultProgress.reminders,
+      smartStartProfile: parsed.smartStartProfile ?? null,
+      lessonProgress: parsed.lessonProgress ?? [],
+      conversationSessions: parsed.conversationSessions ?? [],
+      wordBanks: parsed.wordBanks ?? [],
+      wordDrillAttempts: parsed.wordDrillAttempts ?? [],
+      reviewLaterWords: parsed.reviewLaterWords ?? [],
+      masteredWords: parsed.masteredWords ?? [],
+      liveMinutesUsed: parsed.liveMinutesUsed ?? {},
+      coachPlanUpdate: parsed.coachPlanUpdate ?? null
+    };
   } catch {
     return defaultProgress;
   }
@@ -185,6 +215,7 @@ export function completePractice(
       }
     ].slice(-100),
     completedLessons: Array.from(new Set([...progress.completedLessons, lessonId])),
+    lessonProgress: markLessonComplete(progress.lessonProgress, lessonId),
     readingScores: [...progress.readingScores, feedback.score].slice(-20),
     missedWords: updatedMissedWords,
     skippedWords: updatedSkippedWords,
@@ -223,20 +254,155 @@ export function findSkippedEndings(expectedText: string, missedWords: string[]) 
   });
 }
 
-export function saveBaselineReport(progress: ProgressState, report: BaselineReport) {
+export function saveBaselineReport(
+  progress: ProgressState,
+  report: BaselineReport,
+  smartStartProfile?: SmartStartProfile
+) {
+  const recommendedLessons = report.recommendedLessonPath.length
+    ? report.recommendedLessonPath
+    : report.firstSevenDayPlan;
   return {
     ...progress,
     baselineCompleted: true,
     baselineReport: report,
+    smartStartProfile: smartStartProfile ?? progress.smartStartProfile,
     learnerProfile: {
       ...progress.learnerProfile,
-      recommendedNextLessons: report.firstSevenDayPlan,
-      nextLessonReason: `Your baseline showed ${report.mainWeakSounds.slice(0, 2).join(" and ")} as good first focus areas.`,
-      focusArea: report.mainWeakSounds[0] ?? "daily clarity",
+      goal: smartStartProfile?.improvementGoal || progress.learnerProfile.goal,
+      confidenceRating: smartStartProfile?.confidenceRating ?? progress.learnerProfile.confidenceRating,
+      recommendedNextLessons: recommendedLessons,
+      nextLessonReason: report.reason || `Your Smart Start showed ${report.mainWeakAreas.slice(0, 2).join(" and ")} as good first focus areas.`,
+      focusArea: report.recommendedStartingPoint || report.mainWeakAreas[0] || report.mainWeakSounds[0] || "daily clarity",
       practiceWarning: report.speedScore < 70 ? "Slow down and finish the final sounds." : "Keep a steady pace and finish each word.",
-      confidenceTip: "You are not removing your accent. You are making your words easier to understand."
+      confidenceTip: report.encouragingSummary || "You are not removing your accent. You are making your words easier to understand."
     }
   };
+}
+
+export function getLessonProgress(progress: ProgressState, lessonId: string): LessonProgress {
+  return (
+    progress.lessonProgress.find((item) => item.lessonId === lessonId) ?? {
+      lessonId,
+      currentStep: 0,
+      completedSteps: [],
+      completed: false,
+      unlocked: true,
+      lastUpdated: new Date().toISOString()
+    }
+  );
+}
+
+export function saveLessonStepProgress(
+  progress: ProgressState,
+  lessonId: string,
+  currentStep: number,
+  stepId?: string
+): ProgressState {
+  const existing = getLessonProgress(progress, lessonId);
+  const next: LessonProgress = {
+    ...existing,
+    currentStep,
+    completedSteps: stepId
+      ? Array.from(new Set([...existing.completedSteps, stepId]))
+      : existing.completedSteps,
+    lastUpdated: new Date().toISOString()
+  };
+  return {
+    ...progress,
+    lessonProgress: [
+      ...progress.lessonProgress.filter((item) => item.lessonId !== lessonId),
+      next
+    ]
+  };
+}
+
+export function resetLessonProgress(progress: ProgressState, lessonId: string): ProgressState {
+  return {
+    ...progress,
+    lessonProgress: [
+      ...progress.lessonProgress.filter((item) => item.lessonId !== lessonId),
+      {
+        lessonId,
+        currentStep: 0,
+        completedSteps: [],
+        completed: false,
+        unlocked: true,
+        lastUpdated: new Date().toISOString()
+      }
+    ]
+  };
+}
+
+export function saveConversationSession(session: ConversationSession) {
+  const progress = loadProgress();
+  saveProgress({
+    ...progress,
+    conversationSessions: [...progress.conversationSessions, session].slice(-100),
+    speakingSpeeds: [...progress.speakingSpeeds, session.feedback.speakingSpeedWpm ?? 0]
+      .filter(Boolean)
+      .slice(-30),
+    readingScores: [...progress.readingScores, session.score].slice(-20)
+  });
+}
+
+export function saveWordBankLocal(bank: WordBank) {
+  const progress = loadProgress();
+  const existingId = bank.id;
+  const existingFocus = bank.focusArea.toLowerCase();
+  saveProgress({
+    ...progress,
+    wordBanks: [
+      ...progress.wordBanks.filter((item) =>
+        existingId ? item.id !== existingId : item.focusArea.toLowerCase() !== existingFocus
+      ),
+      bank
+    ].slice(-10)
+  });
+}
+
+export function saveWordDrillAttemptLocal(attempt: WordDrillAttempt) {
+  const progress = loadProgress();
+  const masteredWords = attempt.passed
+    ? Array.from(new Set([...progress.masteredWords, attempt.word.toLowerCase()]))
+    : progress.masteredWords;
+  const reviewLaterWords = attempt.reviewLater
+    ? Array.from(new Set([...progress.reviewLaterWords, attempt.word.toLowerCase()]))
+    : progress.reviewLaterWords.filter((word) => word !== attempt.word.toLowerCase());
+
+  saveProgress({
+    ...progress,
+    wordDrillAttempts: [...progress.wordDrillAttempts, attempt].slice(-300),
+    masteredWords,
+    reviewLaterWords
+  });
+}
+
+export function addLiveMinutes(minutes: number) {
+  const progress = loadProgress();
+  const today = todayKey();
+  saveProgress({
+    ...progress,
+    liveMinutesUsed: {
+      ...progress.liveMinutesUsed,
+      [today]: Math.round(((progress.liveMinutesUsed[today] ?? 0) + minutes) * 10) / 10
+    }
+  });
+}
+
+function markLessonComplete(lessonProgress: LessonProgress[], lessonId: string) {
+  const existing = lessonProgress.find((item) => item.lessonId === lessonId);
+  const next: LessonProgress = {
+    ...(existing ?? {
+      lessonId,
+      currentStep: 0,
+      completedSteps: [],
+      unlocked: true
+    }),
+    completed: true,
+    lastUpdated: new Date().toISOString()
+  };
+  return [...lessonProgress.filter((item) => item.lessonId !== lessonId), next];
 }
 
 export function average(values: number[]) {

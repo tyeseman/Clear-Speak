@@ -7,13 +7,17 @@ const weakSoundLessonMap: Record<string, string> = {
   "r/l": "r-l-clarity",
   "v and b": "v-b",
   "v/b": "v-b",
-  "short i": "short-i",
-  "long e": "long-e",
+  "short i": "short-i-long-e",
+  "long e": "short-i-long-e",
+  vowel: "short-i-long-e",
   final: "final-consonants",
   endings: "final-consonants",
+  cluster: "consonant-clusters",
+  blended: "consonant-clusters",
   stress: "word-stress",
   rhythm: "sentence-rhythm",
-  speed: "sentence-rhythm"
+  speed: "sentence-rhythm",
+  conversation: "conversation-transfer"
 };
 
 export type AdaptiveRecommendation = {
@@ -49,7 +53,28 @@ export function recommendNextLesson(progress: ProgressState): AdaptiveRecommenda
     };
   }
 
-  const weakFromBaseline = progress.baselineReport?.mainWeakSounds
+  const weakFromPlan = [
+    progress.coachPlanUpdate?.nextFocusArea ?? "",
+    progress.coachPlanUpdate?.recommendedWordBankFocus ?? "",
+    ...(progress.coachPlanUpdate?.recommendedLessons ?? []),
+    ...(progress.coachPlanUpdate?.mainWeakAreas ?? [])
+  ]
+    .map((sound) => mapWeakSound(sound))
+    .find(Boolean);
+
+  if (weakFromPlan) {
+    return build(
+      weakFromPlan,
+      progress.coachPlanUpdate?.reason ?? "Your latest saved work updated this as the best next focus.",
+      findLesson(weakFromPlan).targetSound
+    );
+  }
+
+  const weakFromBaseline = [
+    progress.baselineReport?.recommendedFirstLesson ?? "",
+    ...(progress.baselineReport?.mainWeakSounds ?? []),
+    ...(progress.baselineReport?.repeatedIssues ?? [])
+  ]
     .map((sound) => mapWeakSound(sound))
     .find(Boolean);
 

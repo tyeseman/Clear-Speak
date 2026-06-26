@@ -23,11 +23,19 @@ const feedbackSchema = {
       additionalProperties: false,
       required: [
         "score",
+        "detectedIssues",
+        "strongPoints",
+        "mainCorrection",
         "whatImproved",
         "mainIssue",
         "mouthTip",
+        "tongueTip",
+        "speedTip",
+        "retryText",
         "tryAgainSentence",
+        "nextRecommendedLesson",
         "practiceWords",
+        "soundFeedback",
         "needsWork",
         "spokeTooFast",
         "skippedWords",
@@ -38,15 +46,52 @@ const feedbackSchema = {
       ],
       properties: {
         score: { type: "number", minimum: 1, maximum: 100 },
+        detectedIssues: {
+          type: "array",
+          maxItems: 6,
+          items: { type: "string" }
+        },
+        strongPoints: {
+          type: "array",
+          maxItems: 4,
+          items: { type: "string" }
+        },
+        mainCorrection: { type: "string" },
         whatImproved: { type: "string" },
         mainIssue: { type: "string" },
         mouthTip: { type: "string" },
+        tongueTip: { type: "string" },
+        speedTip: { type: "string" },
+        retryText: { type: "string" },
         tryAgainSentence: { type: "string" },
+        nextRecommendedLesson: { type: "string" },
         practiceWords: {
           type: "array",
           minItems: 1,
           maxItems: 5,
           items: { type: "string" }
+        },
+        soundFeedback: {
+          type: "array",
+          maxItems: 8,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "targetSound",
+              "expectedWord",
+              "transcriptResult",
+              "issueDetected",
+              "correction"
+            ],
+            properties: {
+              targetSound: { type: "string" },
+              expectedWord: { type: "string" },
+              transcriptResult: { type: "string" },
+              issueDetected: { type: "string" },
+              correction: { type: "string" }
+            }
+          }
         },
         needsWork: { type: "string" },
         spokeTooFast: { type: "boolean" },

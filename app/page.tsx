@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarCheck, Flame, Volume2 } from "lucide-react";
+import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Flame, Volume2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard } from "@/components/StatCard";
 import { lessons } from "@/data/lessons";
 import { recommendNextLesson } from "@/lib/adaptive";
+import { buildTodayPlan } from "@/lib/coachInsights";
 import { defaultProgress, loadProgress } from "@/lib/progress";
 import { loadRemoteProgress } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
@@ -32,6 +33,7 @@ export default function DashboardPage() {
 
   const recommendation = recommendNextLesson(progress);
   const todayLesson = recommendation.lesson;
+  const todayPlan = buildTodayPlan(progress, todayLesson);
 
   if (!mounted) {
     return (
@@ -59,12 +61,12 @@ export default function DashboardPage() {
                 {progress.baselineCompleted ? "Today" : "Required first step"}
               </p>
               <h1 className="mt-2 text-3xl font-bold text-ink">
-                {progress.baselineCompleted ? "Practice for 10 minutes" : "Take your baseline assessment"}
+                {progress.baselineCompleted ? "Practice for 10 minutes" : "Take your Smart Start assessment"}
               </h1>
               <p className="mt-3 max-w-2xl text-lg leading-8 text-ink/70">
                 {progress.baselineCompleted
                   ? `Work on ${todayLesson.name}. Listen, read, record, and get simple feedback.`
-                  : "This creates your starting report, weak sounds list, and first 7-day practice plan."}
+                  : "This places your current speaking, pronunciation, reading, grammar, confidence, and clarity level."}
               </p>
               {progress.baselineCompleted ? (
                 <div className="mt-4 rounded-md bg-[#eef5ef] p-3 text-sm leading-6 text-ink/75">
@@ -76,7 +78,7 @@ export default function DashboardPage() {
               href={progress.baselineCompleted ? "/practice" : "/assessment"}
               className="focus-ring inline-flex h-14 items-center justify-center gap-2 rounded-md bg-leaf px-5 text-lg font-bold text-white"
             >
-              {progress.baselineCompleted ? "Start Today's Practice" : "Start Assessment"}
+              {progress.baselineCompleted ? "Start Today's Practice" : "Start Smart Start"}
               <ArrowRight size={20} />
             </Link>
           </div>
@@ -88,9 +90,53 @@ export default function DashboardPage() {
           <StatCard
             label="Baseline"
             value={progress.baselineCompleted ? "Done" : "Needed"}
-            detail={progress.baselineReport?.date ?? "Required before lessons"}
+            detail={progress.baselineReport?.date ?? "Smart Start before lessons"}
           />
         </section>
+
+        {progress.baselineCompleted ? (
+          <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CalendarCheck className="text-leaf" size={22} />
+                  <h2 className="text-xl font-bold">Today&apos;s coach plan</h2>
+                </div>
+                <p className="mt-2 text-ink/70">
+                  A short path that connects lessons, live drill, reading, and conversation.
+                </p>
+              </div>
+              <span className="rounded-md bg-[#eef5ef] px-3 py-2 text-sm font-semibold text-leaf">
+                {todayPlan.reduce((total, item) => total + item.minutes, 0)} min
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-4">
+              {todayPlan.map((item, index) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="focus-ring rounded-md border border-black/10 p-4 hover:bg-[#f7f4ee]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold uppercase tracking-wide text-leaf">
+                      Step {index + 1}
+                    </span>
+                    {item.state === "done" ? (
+                      <CheckCircle2 size={18} className="text-leaf" />
+                    ) : (
+                      <Clock size={18} className="text-ink/45" />
+                    )}
+                  </div>
+                  <div className="mt-2 font-bold">{item.title}</div>
+                  <p className="mt-2 min-h-12 text-sm leading-6 text-ink/70">{item.detail}</p>
+                  <div className="mt-3 text-sm font-semibold text-ink/60">
+                    {item.minutes} min · {item.state === "review" ? "review" : item.state}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-5 grid gap-5 lg:grid-cols-2">
           <div className="rounded-md bg-white p-5 shadow-soft">

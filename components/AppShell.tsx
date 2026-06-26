@@ -10,6 +10,8 @@ import {
   GraduationCap,
   Home,
   Mic2,
+  Phone,
+  Radio,
   Settings
 } from "lucide-react";
 import { checkDueReminders } from "@/lib/reminders";
@@ -18,8 +20,10 @@ const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/assessment", label: "Assess", icon: ClipboardCheck },
   { href: "/practice", label: "Practice", icon: Mic2 },
+  { href: "/live-drill", label: "Live", icon: Radio },
   { href: "/lessons", label: "Lessons", icon: GraduationCap },
   { href: "/reading", label: "Reading", icon: BookOpen },
+  { href: "/conversation", label: "Talk", icon: Phone },
   { href: "/progress", label: "Progress", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
@@ -72,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white md:hidden">
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-9">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
