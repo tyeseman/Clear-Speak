@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, RefreshCw, Square, Wand2 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { Mic, RefreshCw, Settings, Square, Wand2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Recorder } from "@/components/Recorder";
-import { TTSButton } from "@/components/TTSButton";
 import { fallbackWordBank } from "@/data/liveDrill";
 import {
   addLiveMinutes,
@@ -27,7 +26,7 @@ import {
 } from "@/lib/remoteProgress";
 import type { FeedbackResult, ProgressState, WordBank, WordBankItem, WordDrillAttempt } from "@/lib/types";
 
-type MicStatus = "Listening" | "Checking" | "Paused" | "Stopped";
+type MicStatus = "Tap to start" | "Listening" | "Checking" | "Try again" | "Good job" | "Paused" | "Stopped";
 
 type SpeechRecognitionLike = {
   continuous: boolean;
@@ -42,6 +41,7 @@ type SpeechRecognitionLike = {
 };
 
 export default function LiveDrillPage() {
+  const router = useRouter();
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [bank, setBank] = useState<WordBank | null>(null);
   const [batchSize, setBatchSize] = useState<25 | 50 | 100>(50);
@@ -52,7 +52,14 @@ export default function LiveDrillPage() {
   const [heardText, setHeardText] = useState("");
   const [message, setMessage] = useState("Generate or load a practice set, then start live drill.");
   const [mouthTip, setMouthTip] = useState("");
-  const [micStatus, setMicStatus] = useState<MicStatus>("Stopped");
+  const [micStatus, setMicStatus] = useState<MicStatus>("Tap to start");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [targetSound, setTargetSound] = useState("");
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [coachVoice, setCoachVoice] = useState(true);
+  const [highQualityVoice, setHighQualityVoice] = useState(false);
   const [running, setRunning] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(false);
   const [confetti, setConfetti] = useState(false);
@@ -79,6 +86,7 @@ export default function LiveDrillPage() {
     const focusArea =
       current.coachPlanUpdate?.recommendedWordBankFocus ||
       current.baselineReport?.recommendedFirstLesson ||
+      targetSound ||
       current.learnerProfile.focusArea ||
       "pronunciation clarity";
     setMessage(force ? "Generating a new practice set..." : "Loading saved practice set...");
@@ -135,7 +143,7 @@ export default function LiveDrillPage() {
       startedAtRef.current = Date.now();
       setRunning(true);
       setMicStatus("Listening");
-      playWord(currentWord.word);
+      if (coachVoice) playWord(currentWord.word);
       await tryRealtimeConnection(stream);
       startSpeechRecognition();
     } catch {
@@ -232,13 +240,14 @@ export default function LiveDrillPage() {
       setConfetti(true);
       window.setTimeout(() => setConfetti(false), 1200);
       setMessage("Good job.");
+      setMicStatus("Good job");
       setSuccesses((value) => value + 1);
       await saveAttempt(currentWord, transcript, nextAttempt, score, true, false, "Good job.");
-      moveNext();
+      if (autoAdvance) moveNext();
       return;
     }
 
-    if (nextAttempt >= 3) {
+    if (nextAttempt >= maxAttempts) {
       setMessage("Review later.");
       setMouthTip(currentWord.mouthTip);
       await saveAttempt(currentWord, transcript, nextAttempt, score, false, true, currentWord.mouthTip);
@@ -248,9 +257,10 @@ export default function LiveDrillPage() {
 
     setAttemptCount(nextAttempt);
     setMessage("Try again.");
+    setMicStatus("Try again");
     setMouthTip(currentWord.mouthTip);
     await saveAttempt(currentWord, transcript, nextAttempt, score, false, false, currentWord.mouthTip);
-    playWord(currentWord.word);
+    if (coachVoice) playWord(currentWord.word);
     setMicStatus("Listening");
   }
 
@@ -288,7 +298,7 @@ export default function LiveDrillPage() {
     setCurrentIndex((index) => {
       const nextIndex = findNextIndex(activeItems, index + 1);
       const nextItem = activeItems[nextIndex];
-      if (nextItem) window.setTimeout(() => playWord(nextItem.word), 500);
+      if (nextItem && coachVoice) window.setTimeout(() => playWord(nextItem.word), 500);
       return nextIndex;
     });
     setMicStatus("Listening");
@@ -361,153 +371,169 @@ export default function LiveDrillPage() {
   }
 
   return (
-    <AppShell>
-      <div className="md:ml-52">
-        {confetti ? <Confetti /> : null}
-        <section className="rounded-md bg-white p-5 shadow-soft">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-bold uppercase tracking-wide text-leaf">Live Word Drill Mode</p>
-              <h1 className="mt-2 text-3xl font-bold">Live pronunciation coach</h1>
-              <p className="mt-3 max-w-3xl text-lg leading-8 text-ink/70">
-                The mic opens only after Start. The app listens for each word, checks it,
-                saves attempts, and keeps review words in rotation.
-              </p>
+    <main className="min-h-screen bg-[#f7f4ee] px-4 py-4">
+      {confetti ? <Confetti /> : null}
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-5xl flex-col">
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0 rounded-md bg-white px-4 py-3 shadow-soft">
+            <p className="text-xs font-bold uppercase tracking-wide text-leaf">Coach recommendation</p>
+            <p className="mt-1 truncate font-semibold text-ink">{message}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((value) => !value)}
+              className="focus-ring grid h-11 w-11 place-items-center rounded-full bg-white text-ink shadow-soft"
+              aria-label="Live drill settings"
+            >
+              <Settings size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                stopLiveDrill();
+                router.push("/");
+              }}
+              className="focus-ring grid h-11 w-11 place-items-center rounded-full bg-white text-ink shadow-soft"
+              aria-label="Exit live drill"
+            >
+              <X size={22} />
+            </button>
+          </div>
+        </header>
+
+        {settingsOpen ? (
+          <section className="mt-4 rounded-md bg-white p-4 shadow-soft">
+            <div className="grid gap-4 md:grid-cols-4">
+              <Select label="Words" value={batchSize} onChange={(value) => setBatchSize(Number(value) as 25 | 50 | 100)} options={["25", "50", "100"]} />
+              <Select label="Time" value={limitMinutes} onChange={(value) => setLimitMinutes(Number(value) as 5 | 10 | 15)} options={["5", "10", "15"]} />
+              <Select label="Difficulty" value={difficulty} onChange={(value) => setDifficulty(value as "easy" | "medium" | "hard")} options={["easy", "medium", "hard"]} />
+              <label>
+                <span className="text-sm font-semibold text-ink/70">Target sound</span>
+                <input
+                  value={targetSound}
+                  onChange={(event) => setTargetSound(event.target.value)}
+                  placeholder="final consonants, TH, rhythm"
+                  className="focus-ring mt-2 h-11 w-full rounded-md border border-black/10 px-3"
+                />
+              </label>
             </div>
-            <div className="rounded-md bg-[#f7f4ee] p-4">
-              <div className="text-sm font-semibold text-ink/60">Mic status</div>
-              <div className="mt-1 text-xl font-bold text-leaf">{micStatus}</div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <Toggle label="Auto-advance" checked={autoAdvance} onChange={setAutoAdvance} />
+              <Toggle label="Coach voice" checked={coachVoice} onChange={setCoachVoice} />
+              <Toggle label="High-quality voice" checked={highQualityVoice} onChange={setHighQualityVoice} />
+              <label>
+                <span className="text-sm font-semibold text-ink/70">Attempts before review</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={maxAttempts}
+                  onChange={(event) => setMaxAttempts(Number(event.target.value))}
+                  className="focus-ring mt-2 h-11 w-full rounded-md border border-black/10 px-3"
+                />
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid flex-1 place-items-center py-6">
+          <div className="w-full max-w-2xl text-center">
+            <div className="mx-auto grid h-44 w-44 place-items-center rounded-full border-[14px] border-leaf/25 bg-white shadow-soft">
+              <div>
+                <div className="text-sm font-bold text-ink/50">Score</div>
+                <div className="text-5xl font-bold text-leaf">{successScore}%</div>
+              </div>
+            </div>
+            <p className="mt-6 font-bold uppercase tracking-wide text-leaf">
+              {currentWord?.targetSound ?? (targetSound || "Load a practice set")}
+            </p>
+            <h1 className="mt-2 text-6xl font-bold text-ink">{currentWord?.word ?? "Ready"}</h1>
+            <p className="mt-3 text-lg font-semibold text-ink/65">
+              {currentWord?.mouthTip ?? "Start once. The mic stays open during the drill."}
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => currentWord && playWord(currentWord.word)}
+                disabled={!currentWord}
+                className="focus-ring h-12 rounded-md bg-white px-4 font-semibold text-ink shadow-soft disabled:opacity-50"
+              >
+                Coach audio
+              </button>
+              <button
+                type="button"
+                className="h-12 rounded-md bg-white px-4 font-semibold text-ink/45 shadow-soft"
+                disabled
+              >
+                User playback
+              </button>
+            </div>
+
+            {heardText && micStatus !== "Listening" ? (
+              <p className="mt-4 rounded-md bg-white p-3 text-sm font-semibold text-ink/70 shadow-soft">
+                Heard: {heardText}
+              </p>
+            ) : null}
+
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => loadOrGenerate(false)}
+                className="focus-ring inline-flex h-11 items-center gap-2 rounded-md bg-white px-4 font-semibold text-ink shadow-soft"
+              >
+                <RefreshCw size={17} />
+                Load set
+              </button>
+              <button
+                type="button"
+                onClick={() => loadOrGenerate(true)}
+                className="focus-ring inline-flex h-11 items-center gap-2 rounded-md bg-white px-4 font-semibold text-ink shadow-soft"
+              >
+                <Wand2 size={17} />
+                New set
+              </button>
             </div>
           </div>
         </section>
 
-        <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
-          <div className="grid gap-4 md:grid-cols-4">
-            <label>
-              <span className="font-semibold text-ink/70">Timer</span>
-              <select
-                value={limitMinutes}
-                onChange={(event) => setLimitMinutes(Number(event.target.value) as 5 | 10 | 15)}
-                className="focus-ring mt-2 h-11 w-full rounded-md border border-black/10 px-3"
-              >
-                {[5, 10, 15].map((minutes) => (
-                  <option key={minutes} value={minutes}>{minutes} minutes</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="font-semibold text-ink/70">Batch size</span>
-              <select
-                value={batchSize}
-                onChange={(event) => setBatchSize(Number(event.target.value) as 25 | 50 | 100)}
-                className="focus-ring mt-2 h-11 w-full rounded-md border border-black/10 px-3"
-              >
-                {[25, 50, 100].map((size) => (
-                  <option key={size} value={size}>{size} words</option>
-                ))}
-              </select>
-            </label>
-            <MiniStat label="Live minutes today" value={`${Math.round(liveMinutesToday * 10) / 10}`} />
-            <MiniStat label="Success score" value={`${successScore}%`} />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3">
+        <footer className="pb-3 text-center">
+          {!running ? (
             <button
               type="button"
-              onClick={() => loadOrGenerate(false)}
-              className="focus-ring inline-flex h-11 items-center gap-2 rounded-md border border-black/10 px-4 font-semibold"
+              onClick={startLiveDrill}
+              className="focus-ring mx-auto grid h-24 w-24 place-items-center rounded-full bg-leaf text-white shadow-soft"
+              aria-label="Start live drill"
             >
-              <RefreshCw size={17} />
-              Load saved set
+              <Mic size={32} />
             </button>
+          ) : (
             <button
               type="button"
-              onClick={() => loadOrGenerate(true)}
-              className="focus-ring inline-flex h-11 items-center gap-2 rounded-md border border-black/10 px-4 font-semibold"
+              onClick={stopLiveDrill}
+              className="focus-ring mx-auto grid h-24 w-24 place-items-center rounded-full bg-coral text-white shadow-soft"
+              aria-label="Stop live drill"
             >
-              <Wand2 size={17} />
-              Generate new practice set
+              <Square size={32} />
             </button>
-            {!running ? (
-              <button
-                type="button"
-                onClick={startLiveDrill}
-                className="focus-ring inline-flex h-11 items-center gap-2 rounded-md bg-leaf px-4 font-semibold text-white"
-              >
-                <Mic size={17} />
-                Start Live Drill
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={stopLiveDrill}
-                className="focus-ring inline-flex h-11 items-center gap-2 rounded-md bg-ink px-4 font-semibold text-white"
-              >
-                <Square size={17} />
-                Stop
-              </button>
-            )}
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
-          <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-            <div>
-              <p className="font-semibold text-leaf">{currentWord?.targetSound ?? "No word selected"}</p>
-              <div className="mt-2 min-h-28 rounded-md bg-[#f7f4ee] p-6 text-center">
-                <div className="text-5xl font-bold text-ink">{currentWord?.word ?? "Load words"}</div>
-                {currentWord ? (
-                  <div className="mt-4">
-                    <TTSButton text={currentWord.word} />
-                  </div>
-                ) : null}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <MiniStat label="Attempt" value={`${attemptCount}/3`} />
-                <MiniStat label="Heard" value={heardText || "-"} />
-                <MiniStat label="Current word" value={`${Math.min(currentIndex + 1, activeItems.length)}/${activeItems.length || 0}`} />
-              </div>
-              <p className={`mt-4 rounded-md p-4 font-semibold ${message === "Good job." ? "bg-[#eef5ef] text-leaf" : "bg-warm/50 text-ink"}`}>
-                {message}
-              </p>
-              {mouthTip ? (
-                <p className="mt-3 rounded-md bg-skysoft/70 p-4 font-semibold">
-                  Mouth/tongue tip: {mouthTip}
-                </p>
-              ) : null}
-              {currentWord ? (
-                <div className="mt-3 rounded-md border border-black/10 p-4 text-sm leading-6 text-ink/70">
-                  <strong>Example:</strong> {currentWord.exampleSentence}
-                  <br />
-                  <strong>Common mistake:</strong> {currentWord.commonMistake}
-                </div>
-              ) : null}
-            </div>
-            <aside className="rounded-md bg-[#f7f4ee] p-4">
-              <h2 className="font-bold">Review later</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {reviewLater.length ? reviewLater.slice(-20).map((word) => (
-                  <span key={word} className="rounded-md bg-white px-3 py-2 text-sm font-semibold">
-                    {word}
-                  </span>
-                )) : <p className="text-sm text-ink/65">No review words yet.</p>}
-              </div>
-            </aside>
-          </div>
-        </section>
+          )}
+          <p className="mt-3 text-lg font-bold text-ink">{micStatus}</p>
+          <p className="text-sm text-ink/60">
+            Attempt {attemptCount}/{maxAttempts} - Word {Math.min(currentIndex + 1, activeItems.length)}/{activeItems.length || 0} - {Math.round(liveMinutesToday * 10) / 10} min today
+          </p>
+        </footer>
 
         {fallbackMode ? (
-          <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
-            <h2 className="text-xl font-bold">Fallback record-submit mode</h2>
-            <p className="mt-2 text-ink/70">
-              Live detection is unavailable in this browser or session. Normal recording still works.
-            </p>
-            <div className="mt-4">
+          <section className="mb-4 rounded-md bg-white p-4 shadow-soft">
+            <h2 className="font-bold">Fallback record-submit mode</h2>
+            <div className="mt-3">
               <Recorder onSubmit={fallbackSubmit} />
             </div>
           </section>
         ) : null}
       </div>
-    </AppShell>
+    </main>
   );
 }
 
@@ -557,6 +583,57 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <div className="text-sm font-semibold text-ink/60">{label}</div>
       <div className="mt-1 truncate text-lg font-bold">{value}</div>
     </div>
+  );
+}
+
+function Select({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <label>
+      <span className="text-sm font-semibold text-ink/70">{label}</span>
+      <select
+        value={String(value)}
+        onChange={(event) => onChange(event.target.value)}
+        className="focus-ring mt-2 h-11 w-full rounded-md border border-black/10 bg-white px-3"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex h-11 items-center justify-between rounded-md border border-black/10 px-3">
+      <span className="text-sm font-semibold text-ink/70">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-5 w-5 accent-leaf"
+      />
+    </label>
   );
 }
 

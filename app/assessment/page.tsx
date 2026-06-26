@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ClipboardCheck, UserRound } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { Recorder } from "@/components/Recorder";
+import { ArrowRight, ClipboardCheck, Mic, Square, UserRound } from "lucide-react";
 import { baselineAssessment, baselineExpectedText } from "@/data/assessment";
 import type { AssessmentReport, ProgressState, SmartStartProfile } from "@/lib/types";
 import {
@@ -48,6 +46,12 @@ export default function AssessmentPage() {
   const [busy, setBusy] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [placementMessage, setPlacementMessage] = useState("");
+  const [started, setStarted] = useState(false);
+  const [micStatus, setMicStatus] = useState<"Tap to start" | "Listening" | "Checking" | "Stopped">("Tap to start");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const startedAtRef = useRef(0);
 
   useEffect(() => {
     const current = loadProgress();
@@ -63,6 +67,53 @@ export default function AssessmentPage() {
 
   function updateProfile<K extends keyof SmartStartProfile>(key: K, value: SmartStartProfile[K]) {
     setProfile((current) => ({ ...current, [key]: value }));
+  }
+
+  function speak(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function startAssessment() {
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const recorder = MediaRecorder.isTypeSupported("audio/webm")
+        ? new MediaRecorder(stream, { mimeType: "audio/webm" })
+        : new MediaRecorder(stream);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      startedAtRef.current = Date.now();
+      setStarted(true);
+      setMicStatus("Listening");
+      speak("Welcome to Smart Start. I will guide you through a short speaking assessment. Answer naturally in your own voice.");
+    } catch {
+      setError("Microphone permission is needed to start Smart Start.");
+    }
+  }
+
+  async function finishAssessment() {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    setMicStatus("Checking");
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+      recorder.stop();
+    });
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setMicStatus("Stopped");
+    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    const durationSeconds = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+    await submitAssessment(blob, durationSeconds);
   }
 
   async function submitAssessment(blob: Blob, durationSeconds: number) {
@@ -180,8 +231,8 @@ export default function AssessmentPage() {
   }
 
   return (
-    <AppShell>
-      <div className="md:ml-52">
+    <main className="min-h-screen bg-[#f7f4ee] px-4 py-5">
+      <div className="mx-auto max-w-5xl">
         <section className="rounded-md bg-white p-5 shadow-soft">
           <div className="flex items-center gap-2 text-leaf">
             <ClipboardCheck size={24} />
@@ -197,6 +248,31 @@ export default function AssessmentPage() {
               Smart Start is complete. Retaking it will refresh your placement.
             </p>
           ) : null}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {!started ? (
+              <button
+                type="button"
+                onClick={startAssessment}
+                className="focus-ring inline-flex h-12 items-center gap-2 rounded-md bg-leaf px-5 font-bold text-white"
+              >
+                <Mic size={18} />
+                Start Assessment
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={finishAssessment}
+                disabled={busy || micStatus === "Checking"}
+                className="focus-ring inline-flex h-12 items-center gap-2 rounded-md bg-coral px-5 font-bold text-white disabled:opacity-60"
+              >
+                <Square size={18} />
+                Finish and analyze
+              </button>
+            )}
+            <span className="rounded-md bg-[#f7f4ee] px-4 py-3 font-semibold text-leaf">
+              Mic: {micStatus}
+            </span>
+          </div>
         </section>
 
         <div className="mt-5 rounded-md bg-white p-4 shadow-soft">
@@ -205,7 +281,10 @@ export default function AssessmentPage() {
               <button
                 key={step}
                 type="button"
-                onClick={() => setActiveStep(index)}
+                  onClick={() => {
+                    setActiveStep(index);
+                    if (started) speak(stepPrompt(index));
+                  }}
                 className={`focus-ring h-9 rounded-md px-3 text-sm font-semibold ${
                   activeStep === index ? "bg-leaf text-white" : "bg-[#eef5ef] text-ink/70"
                 }`}
@@ -230,7 +309,10 @@ export default function AssessmentPage() {
             <p className="mt-4 rounded-md bg-[#f7f4ee] p-4 text-lg leading-9">
               {baselineAssessment.passage}
             </p>
-            <StepButtons onBack={() => setActiveStep(0)} onNext={() => setActiveStep(2)} />
+            <StepButtons onBack={() => setActiveStep(0)} onNext={() => {
+              setActiveStep(2);
+              if (started) speak(stepPrompt(2));
+            }} />
           </section>
         ) : null}
 
@@ -258,7 +340,10 @@ export default function AssessmentPage() {
               </ol>
             </div>
             <div className="lg:col-span-2">
-              <StepButtons onBack={() => setActiveStep(1)} onNext={() => setActiveStep(3)} />
+              <StepButtons onBack={() => setActiveStep(1)} onNext={() => {
+                setActiveStep(3);
+                if (started) speak(stepPrompt(3));
+              }} />
             </div>
           </section>
         ) : null}
@@ -267,15 +352,21 @@ export default function AssessmentPage() {
           <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
             <h2 className="text-xl font-bold">Free speaking and recording</h2>
             <p className="mt-2 text-ink/70">
-              Record once after you are ready. Read the passage, words, sentences, and then answer the prompt.
+              Keep speaking while the mic stays open. Read the passage, words, sentences, and then answer the prompt.
             </p>
             <div className="mt-4 rounded-md bg-[#f7f4ee] p-4">
               <div className="font-semibold">Free speaking prompt</div>
               <p className="mt-2 text-lg leading-8">{baselineAssessment.freeSpeakingPrompt}</p>
             </div>
-            <div className="mt-4">
-              <Recorder onSubmit={submitAssessment} />
-            </div>
+            <button
+              type="button"
+              onClick={finishAssessment}
+              disabled={!started || busy || micStatus === "Checking"}
+              className="focus-ring mt-4 inline-flex h-12 items-center gap-2 rounded-md bg-leaf px-5 font-bold text-white disabled:opacity-60"
+            >
+              <Square size={18} />
+              Finish Smart Start
+            </button>
             {busy ? <p className="mt-3 text-ink/65">Creating your placement report...</p> : null}
             {saveStatus !== "idle" ? (
               <p className="mt-3 font-semibold text-leaf">
@@ -296,8 +387,18 @@ export default function AssessmentPage() {
           />
         ) : null}
       </div>
-    </AppShell>
+    </main>
   );
+}
+
+function stepPrompt(index: number) {
+  return [
+    "First, tell me why you are here and what you want to improve.",
+    "Now read the passage aloud at a natural pace.",
+    "Now read the word list and sentences clearly.",
+    "Now tell me about yourself and why you want to improve your speaking.",
+    "Your Smart Start result is ready."
+  ][index] ?? "Continue the assessment.";
 }
 
 function ProfileStep({
@@ -379,7 +480,9 @@ function ProfileStep({
           />
         </label>
       </div>
-      <StepButtons onNext={onNext} />
+      <StepButtons onNext={() => {
+        onNext();
+      }} />
     </section>
   );
 }

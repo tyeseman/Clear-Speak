@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Lock, LogOut } from "lucide-react";
-import { clearAuth, defaultUserEmail, isAuthenticated, saveAuth } from "@/lib/progress";
+import { clearAuth, defaultUserEmail, isAuthenticated, loadProgress, saveAuth } from "@/lib/progress";
 import { initializeRemoteDatabase, loadRemoteProgress } from "@/lib/remoteProgress";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const hideAppChrome = pathname === "/assessment" || pathname === "/live-drill";
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [checkingPlacement, setCheckingPlacement] = useState(false);
   const [email, setEmail] = useState(defaultUserEmail);
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
@@ -17,12 +22,20 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     const authenticated = isAuthenticated();
     setAuthed(authenticated);
     if (authenticated) {
+      setCheckingPlacement(true);
       initializeRemoteDatabase()
         .then(() => loadRemoteProgress())
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          const progress = loadProgress();
+          if (!progress.baselineCompleted && pathname !== "/assessment") {
+            router.replace("/assessment");
+          }
+          setCheckingPlacement(false);
+        });
     }
     setReady(true);
-  }, []);
+  }, [pathname, router]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -43,6 +56,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       await initializeRemoteDatabase();
       await loadRemoteProgress();
       setAuthed(true);
+      if (!loadProgress().baselineCompleted) {
+        router.replace("/assessment");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Private access required.");
     } finally {
@@ -114,16 +130,29 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (checkingPlacement && pathname !== "/assessment") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f7f4ee] px-4">
+        <section className="w-full max-w-sm rounded-md bg-white p-5 shadow-soft">
+          <h1 className="text-2xl font-bold text-ink">Preparing Smart Start</h1>
+          <p className="mt-3 leading-7 text-ink/70">Your first assessment will open before the app menu.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={signOut}
-        className="focus-ring fixed right-4 top-4 z-50 inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-semibold text-ink shadow-soft"
-      >
-        <LogOut size={15} />
-        Lock
-      </button>
+      {!hideAppChrome ? (
+        <button
+          type="button"
+          onClick={signOut}
+          className="focus-ring fixed right-4 top-4 z-50 inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-semibold text-ink shadow-soft"
+        >
+          <LogOut size={15} />
+          Lock
+        </button>
+      ) : null}
       {children}
     </>
   );
