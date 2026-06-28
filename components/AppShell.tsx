@@ -3,27 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  BarChart3,
-  BookOpen,
-  ClipboardCheck,
-  GraduationCap,
-  Home,
-  Mic2,
-  Phone,
-  Radio,
-  Settings
-} from "lucide-react";
+import { BarChart3, Home, Mic2, Settings } from "lucide-react";
 import { checkDueReminders } from "@/lib/reminders";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/assessment", label: "Assess", icon: ClipboardCheck },
+  { href: "/", label: "Today", icon: Home },
   { href: "/practice", label: "Practice", icon: Mic2 },
-  { href: "/live-drill", label: "Live", icon: Radio },
-  { href: "/lessons", label: "Lessons", icon: GraduationCap },
-  { href: "/reading", label: "Reading", icon: BookOpen },
-  { href: "/conversation", label: "Talk", icon: Phone },
   { href: "/progress", label: "Progress", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
@@ -52,10 +37,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <Link href="/" className="focus-ring rounded-md">
             <span className="block text-xl font-bold text-leaf">KoloSpeak Coach</span>
-            <span className="block text-sm text-ink/70">Clarity with your own voice</span>
+            <span className="block text-sm text-ink/70">Listen. Speak. Correct. Repeat.</span>
           </Link>
           <span className="rounded-md bg-[#eef5ef] px-3 py-1 text-xs font-semibold text-leaf">
-            v2026.06.23
+            Voice-first
           </span>
         </div>
       </header>
@@ -76,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white md:hidden">
-        <div className="grid grid-cols-9">
+        <div className="grid grid-cols-4">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;

@@ -231,10 +231,12 @@ export function PracticeCoach({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-sm font-bold uppercase tracking-wide text-leaf">
-              {mode === "daily" ? "Daily lesson" : mode === "reading" ? "Reading practice" : "Sound lesson"} · Level {currentStep.level}
+              {mode === "daily" ? "Daily lesson" : mode === "reading" ? "Reading practice" : "Sound lesson"} - Level {currentStep.level}
             </div>
             <h1 className="mt-2 text-3xl font-bold text-ink">{lesson.name}</h1>
-            <p className="mt-3 max-w-2xl text-lg leading-8 text-ink/75">{lesson.instruction}</p>
+            <p className="mt-3 max-w-2xl text-lg font-semibold leading-8 text-ink/75">
+              Listen, speak, correct, repeat.
+            </p>
           </div>
           <button
             type="button"
@@ -296,6 +298,24 @@ function shouldUpdatePlan(progress: { completedSessions: number }) {
   return progress.completedSessions === 1 || progress.completedSessions % 3 === 0;
 }
 
+function toEmbedUrl(url: string) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("youtube.com")) {
+      const id = parsed.searchParams.get("v");
+      return id ? `https://www.youtube.com/embed/${id}` : url;
+    }
+    if (parsed.hostname.includes("youtu.be")) {
+      const id = parsed.pathname.replace("/", "");
+      return id ? `https://www.youtube.com/embed/${id}` : url;
+    }
+    return url;
+  } catch {
+    return "";
+  }
+}
+
 function StepPanel({
   step,
   lesson,
@@ -327,15 +347,12 @@ function StepPanel({
     return (
       <section className="rounded-md bg-white p-5 shadow-soft">
         <h2 className="text-xl font-bold">{step.title}</h2>
-        <p className="mt-3 leading-8 text-ink/75">{step.instruction}</p>
+        <p className="mt-3 text-lg font-semibold text-ink/75">Watch the mouth. Hear the sound. Then say it.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <InfoBox label="Target" value={lesson.targetSound} />
           <InfoBox label="Common mistake" value={lesson.commonMistake} />
           <InfoBox label="Correct example" value={lesson.correctSoundExample} />
         </div>
-        <p className="mt-4 rounded-md bg-[#eef5ef] p-4 font-semibold text-leaf">
-          You are training clarity and control. The goal is not to erase your Liberian voice.
-        </p>
       </section>
     );
   }
@@ -347,13 +364,7 @@ function StepPanel({
           <Video size={22} />
           <h2 className="text-xl font-bold">{lesson.video.title}</h2>
         </div>
-        <div className="mt-4 rounded-md border border-dashed border-black/20 bg-[#f7f4ee] p-5">
-          <p className="font-semibold">Expert video coming soon</p>
-          <p className="mt-2 text-ink/70">{lesson.video.transcript}</p>
-          <p className="mt-2 text-sm font-semibold text-coral">
-            Do not copy or embed videos unless you own them or have permission.
-          </p>
-        </div>
+        <CoachMedia lesson={lesson} />
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {lesson.video.keyPoints.map((point) => (
             <div key={point} className="rounded-md bg-skysoft/60 p-4 font-semibold">
@@ -381,7 +392,7 @@ function StepPanel({
     return (
       <section className="rounded-md bg-white p-5 shadow-soft">
         <h2 className="text-xl font-bold">{step.title}</h2>
-        <p className="mt-2 text-ink/75">{step.instruction}</p>
+        <p className="mt-2 font-semibold text-ink/70">{step.instruction}</p>
         <div className="mt-4 grid gap-3">
           {items.map((item) => (
             <button
@@ -434,11 +445,15 @@ function StepPanel({
                 </div>
               </div>
             </div>
-            <FeedbackLine title="Main correction" text={feedback.mainCorrection ?? feedback.mainIssue} />
+            <FeedbackLine title="Fix this" text={feedback.mainCorrection ?? feedback.mainIssue} />
             <FeedbackLine title="Mouth tip" text={feedback.mouthTip} />
+            <FeedbackLine title="Try again" text={feedback.retryText ?? feedback.tryAgainSentence} />
+            <PillGroup title="Practice words" items={feedback.practiceWords.slice(0, 5)} />
+            <details className="rounded-md bg-[#f7f4ee] p-4">
+              <summary className="cursor-pointer font-bold text-ink">View details</summary>
+              <div className="mt-4 space-y-4">
             <FeedbackLine title="Tongue tip" text={feedback.tongueTip ?? "Keep the target position steady."} />
             <FeedbackLine title="Speed tip" text={feedback.speedTip ?? "Use a small pause before important words."} />
-            <FeedbackLine title="Retry text" text={feedback.retryText ?? feedback.tryAgainSentence} />
             <div className="grid gap-3 sm:grid-cols-3">
               <MiniStat label="Speed" value={`${feedback.speakingSpeedWpm ?? 0} WPM`} />
               <MiniStat label="Accuracy" value={`${feedback.readingAccuracy ?? 0}%`} />
@@ -446,7 +461,6 @@ function StepPanel({
             </div>
             <PillGroup title="Detected issues" items={feedback.detectedIssues ?? [feedback.mainIssue]} />
             <PillGroup title="Strong points" items={feedback.strongPoints ?? [feedback.whatImproved]} />
-            <PillGroup title="Practice words" items={feedback.practiceWords} />
             {feedback.soundFeedback?.length ? (
               <div>
                 <div className="font-semibold">Sound-by-sound feedback</div>
@@ -455,7 +469,7 @@ function StepPanel({
                     <div key={`${item.expectedWord}-${item.issueDetected}`} className="rounded-md border border-black/10 p-3">
                       <div className="font-semibold">{item.targetSound}: {item.expectedWord}</div>
                       <p className="mt-1 text-sm text-ink/70">
-                        Heard: {item.transcriptResult || "not clear"} · {item.issueDetected} · {item.correction}
+                            Heard: {item.transcriptResult || "not clear"} - {item.issueDetected} - {item.correction}
                       </p>
                     </div>
                   ))}
@@ -471,6 +485,8 @@ function StepPanel({
               <div className="text-sm font-semibold text-ink/60">Transcription</div>
               <p className="mt-2">{transcription}</p>
             </div>
+              </div>
+            </details>
           </div>
         ) : (
           <div className="mt-4 flex items-center gap-2 text-ink/70">
@@ -500,7 +516,7 @@ function StepPanel({
 function CoachCardPanel({ card }: { card: CoachCard }) {
   return (
     <section className="rounded-md bg-white p-5 shadow-soft">
-      <h2 className="text-xl font-bold">Coach card</h2>
+      <h2 className="text-xl font-bold">Mouth guide</h2>
       <div className="mt-4 grid gap-4 lg:grid-cols-[260px_1fr]">
         <MouthDiagram kind={card.diagram} />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -513,6 +529,39 @@ function CoachCardPanel({ card }: { card: CoachCard }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function CoachMedia({ lesson }: { lesson: SoundLesson }) {
+  const embedUrl = toEmbedUrl(lesson.video.videoUrl);
+
+  if (embedUrl) {
+    return (
+      <div className="mt-4 overflow-hidden rounded-md bg-ink shadow-soft">
+        <iframe
+          title={lesson.video.title}
+          src={embedUrl}
+          className="aspect-video w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+        <div className="bg-white p-3 text-sm font-semibold text-ink/70">
+          {lesson.video.license && lesson.video.license !== "unknown"
+            ? `Source: ${lesson.video.source || "permitted media"}`
+            : "Use only owned, Creative Commons, public-domain, or permitted embed media."}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-md border border-dashed border-black/20 bg-[#f7f4ee] p-5">
+      <p className="font-bold">Coach visual fallback</p>
+      <p className="mt-2 font-semibold text-ink/70">{lesson.video.transcript}</p>
+      <p className="mt-2 text-sm font-semibold text-coral">
+        Add media only when the source and license are safe.
+      </p>
+    </div>
   );
 }
 

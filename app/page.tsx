@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarCheck, CheckCircle2, Clock, Flame, Volume2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Flame, Mic2, Volume2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { StatCard } from "@/components/StatCard";
 import { lessons } from "@/data/lessons";
 import { recommendNextLesson } from "@/lib/adaptive";
-import { buildTodayPlan } from "@/lib/coachInsights";
 import { defaultProgress, loadProgress } from "@/lib/progress";
 import { loadRemoteProgress } from "@/lib/remoteProgress";
 import type { ProgressState } from "@/lib/types";
 
-export default function DashboardPage() {
+export default function TodayPage() {
   const [progress, setProgress] = useState<ProgressState>(defaultProgress);
   const [mounted, setMounted] = useState(false);
 
@@ -24,164 +22,66 @@ export default function DashboardPage() {
       .catch(() => undefined);
   }, []);
 
-  const weakSounds = useMemo(() => {
-    const scoreMap = new Map(progress.soundScores.map((score) => [score.lessonId, score.bestScore]));
-    return lessons
-      .filter((lesson) => (scoreMap.get(lesson.id) ?? 0) < 75)
-      .slice(0, 3);
-  }, [progress.soundScores]);
-
   const recommendation = recommendNextLesson(progress);
-  const todayLesson = recommendation.lesson;
-  const todayPlan = buildTodayPlan(progress, todayLesson);
-
-  if (!mounted) {
-    return (
-      <AppShell>
-        <div className="md:ml-52">
-          <section className="rounded-md bg-white p-5 shadow-soft">
-            <p className="font-bold uppercase tracking-wide text-leaf">Loading</p>
-            <h1 className="mt-2 text-3xl font-bold text-ink">KoloSpeak Coach</h1>
-            <p className="mt-3 max-w-2xl text-lg leading-8 text-ink/70">
-              Loading your private progress from this device.
-            </p>
-          </section>
-        </div>
-      </AppShell>
-    );
-  }
+  const focusSound =
+    progress.coachPlanUpdate?.nextFocusArea ||
+    progress.baselineReport?.mainWeakSounds[0] ||
+    recommendation.focusArea ||
+    lessons[0].targetSound;
+  const coachNote = progress.baselineCompleted
+    ? shortCoachNote(progress, focusSound)
+    : "Start with your real voice so your path fits you.";
+  const startHref = progress.baselineCompleted ? "/live-drill" : "/assessment";
+  const startLabel = progress.baselineCompleted ? "Start practice" : "Start Smart Start";
 
   return (
     <AppShell>
       <div className="md:ml-52">
-        <section className="rounded-md bg-white p-5 shadow-soft">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-bold uppercase tracking-wide text-leaf">
-                {progress.baselineCompleted ? "Today" : "Required first step"}
-              </p>
-              <h1 className="mt-2 text-3xl font-bold text-ink">
-                {progress.baselineCompleted ? "Practice for 10 minutes" : "Take your Smart Start assessment"}
-              </h1>
-              <p className="mt-3 max-w-2xl text-lg leading-8 text-ink/70">
-                {progress.baselineCompleted
-                  ? `Work on ${todayLesson.name}. Listen, read, record, and get simple feedback.`
-                  : "This places your current speaking, pronunciation, reading, grammar, confidence, and clarity level."}
-              </p>
-              {progress.baselineCompleted ? (
-                <div className="mt-4 rounded-md bg-[#eef5ef] p-3 text-sm leading-6 text-ink/75">
-                  <strong className="text-leaf">Why this lesson:</strong> {recommendation.reason}
-                </div>
-              ) : null}
+        <section className="grid min-h-[68vh] place-items-center">
+          <div className="w-full max-w-xl rounded-md bg-white p-5 text-center shadow-soft">
+            <p className="text-sm font-bold uppercase tracking-wide text-leaf">
+              {mounted && progress.baselineCompleted ? "Today" : "First step"}
+            </p>
+            <h1 className="mt-3 text-4xl font-bold text-ink">
+              {progress.baselineCompleted ? "10 minutes of clear speech" : "Smart Start"}
+            </h1>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <TodayStat icon={<Volume2 size={19} />} label="Focus" value={focusSound} />
+              <TodayStat icon={<Flame size={19} />} label="Streak" value={`${progress.streak} days`} />
+              <TodayStat icon={<Mic2 size={19} />} label="Mode" value={progress.baselineCompleted ? "Live drill" : "Voice test"} />
             </div>
+            <p className="mx-auto mt-5 max-w-md text-lg font-semibold leading-8 text-ink/75">
+              {coachNote}
+            </p>
             <Link
-              href={progress.baselineCompleted ? "/practice" : "/assessment"}
-              className="focus-ring inline-flex h-14 items-center justify-center gap-2 rounded-md bg-leaf px-5 text-lg font-bold text-white"
+              href={startHref}
+              className="focus-ring mt-6 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-leaf px-7 text-lg font-bold text-white"
             >
-              {progress.baselineCompleted ? "Start Today's Practice" : "Start Smart Start"}
+              {startLabel}
               <ArrowRight size={20} />
             </Link>
           </div>
         </section>
-
-        <section className="mt-5 grid gap-4 sm:grid-cols-3">
-          <StatCard label="Current streak" value={progress.streak} detail="days in a row" />
-          <StatCard label="Sessions completed" value={progress.completedSessions} />
-          <StatCard
-            label="Baseline"
-            value={progress.baselineCompleted ? "Done" : "Needed"}
-            detail={progress.baselineReport?.date ?? "Smart Start before lessons"}
-          />
-        </section>
-
-        {progress.baselineCompleted ? (
-          <section className="mt-5 rounded-md bg-white p-5 shadow-soft">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <CalendarCheck className="text-leaf" size={22} />
-                  <h2 className="text-xl font-bold">Today&apos;s coach plan</h2>
-                </div>
-                <p className="mt-2 text-ink/70">
-                  A short path that connects lessons, live drill, reading, and conversation.
-                </p>
-              </div>
-              <span className="rounded-md bg-[#eef5ef] px-3 py-2 text-sm font-semibold text-leaf">
-                {todayPlan.reduce((total, item) => total + item.minutes, 0)} min
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-4">
-              {todayPlan.map((item, index) => (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="focus-ring rounded-md border border-black/10 p-4 hover:bg-[#f7f4ee]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold uppercase tracking-wide text-leaf">
-                      Step {index + 1}
-                    </span>
-                    {item.state === "done" ? (
-                      <CheckCircle2 size={18} className="text-leaf" />
-                    ) : (
-                      <Clock size={18} className="text-ink/45" />
-                    )}
-                  </div>
-                  <div className="mt-2 font-bold">{item.title}</div>
-                  <p className="mt-2 min-h-12 text-sm leading-6 text-ink/70">{item.detail}</p>
-                  <div className="mt-3 text-sm font-semibold text-ink/60">
-                    {item.minutes} min · {item.state === "review" ? "review" : item.state}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="mt-5 grid gap-5 lg:grid-cols-2">
-          <div className="rounded-md bg-white p-5 shadow-soft">
-            <div className="flex items-center gap-2">
-              <Volume2 className="text-leaf" size={22} />
-              <h2 className="text-xl font-bold">Weak sounds to review</h2>
-            </div>
-            <div className="mt-4 space-y-3">
-              {progress.baselineReport?.mainWeakSounds.length
-                ? progress.baselineReport.mainWeakSounds.slice(0, 4).map((sound) => (
-                    <div key={sound} className="rounded-md border border-black/5 p-4">
-                      <span className="font-semibold">{sound}</span>
-                    </div>
-                  ))
-                : weakSounds.map((lesson) => (
-                    <Link
-                      key={lesson.id}
-                      href="/lessons"
-                      className="focus-ring block rounded-md border border-black/5 p-4 hover:bg-[#eef5ef]"
-                    >
-                      <span className="font-semibold">{lesson.name}</span>
-                      <span className="mt-1 block text-sm text-ink/65">{lesson.instruction}</span>
-                    </Link>
-                  ))}
-            </div>
-          </div>
-
-          <div className="rounded-md bg-white p-5 shadow-soft">
-            <div className="flex items-center gap-2">
-              <CalendarCheck className="text-leaf" size={22} />
-              <h2 className="text-xl font-bold">Practice plan</h2>
-            </div>
-            <div className="mt-4 space-y-3 text-ink/75">
-              <p>Focus area: {recommendation.focusArea}</p>
-              <p>{recommendation.practiceWarning}</p>
-              <p>{recommendation.confidenceTip}</p>
-              <p>Your audio is uploaded only when you submit a final recording.</p>
-              <p className="flex items-center gap-2 font-semibold text-leaf">
-                <Flame size={18} />
-                Keep your streak with one saved session each day.
-              </p>
-            </div>
-          </div>
-        </section>
       </div>
     </AppShell>
+  );
+}
+
+function shortCoachNote(progress: ProgressState, focusSound: string) {
+  if (progress.coachPlanUpdate?.progressSummary) return progress.coachPlanUpdate.progressSummary;
+  if (progress.reviewLaterWords.length) return "Start with review words. Say each one slowly.";
+  if ((progress.baselineReport?.speedScore ?? 100) < 75) return `Slow down. Today, focus on ${focusSound}.`;
+  return `Listen first. Then say ${focusSound} with control.`;
+}
+
+function TodayStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-[#f7f4ee] p-3">
+      <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-white text-leaf">
+        {icon}
+      </div>
+      <div className="mt-2 text-xs font-bold uppercase tracking-wide text-ink/50">{label}</div>
+      <div className="mt-1 truncate font-bold text-ink">{value}</div>
+    </div>
   );
 }

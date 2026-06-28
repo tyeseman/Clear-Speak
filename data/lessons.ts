@@ -82,12 +82,15 @@ function placeholderVideo(title: string) {
     videoUrl: "",
     thumbnail: "",
     transcript:
-      "Add your own video URL here. Use only videos you own or have permission to embed.",
+      "Use a short owned, Creative Commons, public-domain, or permitted embed video. If none is available, the coach card teaches the mouth position.",
     keyPoints: [
-      "Self-hosted video can be added later.",
-      "YouTube or Vimeo embeds can be used only when embedding is allowed.",
-      "The coach card below is the fallback lesson until a video is available."
-    ]
+      "Watch the mouth shape.",
+      "Listen once before speaking.",
+      "Practice immediately after the clip."
+    ],
+    source: "",
+    license: "unknown" as const,
+    attribution: ""
   };
 }
 

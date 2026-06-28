@@ -29,6 +29,9 @@ export type VideoLesson = {
   thumbnail: string;
   transcript: string;
   keyPoints: string[];
+  source?: string;
+  license?: "owned" | "creative-commons" | "public-domain" | "embed-only" | "unknown";
+  attribution?: string;
 };
 
 export type CoachCard = {

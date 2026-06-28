@@ -67,6 +67,16 @@ export default function LiveDrillPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
+  const activeItemsRef = useRef<WordBankItem[]>([]);
+  const currentIndexRef = useRef(0);
+  const attemptCountRef = useRef(0);
+  const micStatusRef = useRef<MicStatus>("Tap to start");
+  const runningRef = useRef(false);
+  const coachVoiceRef = useRef(true);
+  const autoAdvanceRef = useRef(true);
+  const maxAttemptsRef = useRef(3);
+  const checkingRef = useRef(false);
+  const ignoreSpeechUntilRef = useRef(0);
 
   useEffect(() => {
     const current = loadProgress();
@@ -80,6 +90,17 @@ export default function LiveDrillPage() {
   const liveMinutesToday = progress?.liveMinutesUsed[todayKey()] ?? 0;
   const reviewLater = progress?.reviewLaterWords ?? [];
   const successScore = activeItems.length ? Math.round((successes / activeItems.length) * 100) : 0;
+
+  useEffect(() => {
+    activeItemsRef.current = activeItems;
+    currentIndexRef.current = currentIndex;
+    attemptCountRef.current = attemptCount;
+    micStatusRef.current = micStatus;
+    runningRef.current = running;
+    coachVoiceRef.current = coachVoice;
+    autoAdvanceRef.current = autoAdvance;
+    maxAttemptsRef.current = maxAttempts;
+  }, [activeItems, currentIndex, attemptCount, micStatus, running, coachVoice, autoAdvance, maxAttempts]);
 
   async function loadOrGenerate(force = false) {
     const current = loadProgress();
@@ -167,6 +188,7 @@ export default function LiveDrillPage() {
     recognition.interimResults = false;
     recognition.lang = "en-US";
     recognition.onresult = (event: any) => {
+      if (Date.now() < ignoreSpeechUntilRef.current) return;
       const result = event.results[event.results.length - 1];
       const transcript = result?.[0]?.transcript ?? "";
       if (transcript) void checkHeardWord(transcript);
@@ -177,7 +199,7 @@ export default function LiveDrillPage() {
       setMessage("Live speech detection paused. Fallback recorder is available.");
     };
     recognition.onend = () => {
-      if (running) {
+      if (runningRef.current) {
         try {
           recognition.start();
         } catch {
@@ -229,11 +251,13 @@ export default function LiveDrillPage() {
   }
 
   async function checkHeardWord(transcript: string) {
-    if (!currentWord || micStatus === "Checking") return;
+    const activeWord = activeItemsRef.current[currentIndexRef.current];
+    if (!activeWord || micStatusRef.current === "Checking" || checkingRef.current) return;
+    checkingRef.current = true;
     setMicStatus("Checking");
-    const nextAttempt = attemptCount + 1;
-    const passed = isWordMatch(currentWord.word, transcript);
-    const score = passed ? 100 : scoreSimilarity(currentWord.word, transcript);
+    const nextAttempt = attemptCountRef.current + 1;
+    const passed = isWordMatch(activeWord.word, transcript);
+    const score = passed ? 100 : scoreSimilarity(activeWord.word, transcript);
     setHeardText(transcript);
 
     if (passed) {
@@ -242,15 +266,17 @@ export default function LiveDrillPage() {
       setMessage("Good job.");
       setMicStatus("Good job");
       setSuccesses((value) => value + 1);
-      await saveAttempt(currentWord, transcript, nextAttempt, score, true, false, "Good job.");
-      if (autoAdvance) moveNext();
+      await saveAttempt(activeWord, transcript, nextAttempt, score, true, false, "Good job.");
+      checkingRef.current = false;
+      if (autoAdvanceRef.current) moveNext();
       return;
     }
 
-    if (nextAttempt >= maxAttempts) {
+    if (nextAttempt >= maxAttemptsRef.current) {
       setMessage("Review later.");
-      setMouthTip(currentWord.mouthTip);
-      await saveAttempt(currentWord, transcript, nextAttempt, score, false, true, currentWord.mouthTip);
+      setMouthTip(activeWord.mouthTip);
+      await saveAttempt(activeWord, transcript, nextAttempt, score, false, true, activeWord.mouthTip);
+      checkingRef.current = false;
       moveNext();
       return;
     }
@@ -258,9 +284,10 @@ export default function LiveDrillPage() {
     setAttemptCount(nextAttempt);
     setMessage("Try again.");
     setMicStatus("Try again");
-    setMouthTip(currentWord.mouthTip);
-    await saveAttempt(currentWord, transcript, nextAttempt, score, false, false, currentWord.mouthTip);
-    if (coachVoice) playWord(currentWord.word);
+    setMouthTip(activeWord.mouthTip);
+    await saveAttempt(activeWord, transcript, nextAttempt, score, false, false, activeWord.mouthTip);
+    if (coachVoiceRef.current) playWord(activeWord.word);
+    checkingRef.current = false;
     setMicStatus("Listening");
   }
 
@@ -293,14 +320,22 @@ export default function LiveDrillPage() {
   }
 
   function moveNext() {
+    ignoreSpeechUntilRef.current = Date.now() + 900;
     setAttemptCount(0);
     setMouthTip("");
-    setCurrentIndex((index) => {
-      const nextIndex = findNextIndex(activeItems, index + 1);
-      const nextItem = activeItems[nextIndex];
-      if (nextItem && coachVoice) window.setTimeout(() => playWord(nextItem.word), 500);
-      return nextIndex;
-    });
+    attemptCountRef.current = 0;
+    const items = activeItemsRef.current;
+    const nextIndex = findNextIndex(items, currentIndexRef.current + 1);
+    const nextItem = items[nextIndex];
+    currentIndexRef.current = nextIndex;
+    setCurrentIndex(nextIndex);
+    if (nextItem && coachVoiceRef.current) {
+      window.setTimeout(() => {
+        if (activeItemsRef.current[currentIndexRef.current]?.word === nextItem.word) {
+          playWord(nextItem.word);
+        }
+      }, 650);
+    }
     setMicStatus("Listening");
     maybeStopByTimer();
     maybeUpdatePlan();
